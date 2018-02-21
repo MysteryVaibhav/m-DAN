@@ -30,12 +30,12 @@ def train():
         losses = []
         start_time = timer()
         num_of_mini_batches = NO_OF_IMAGES // BATCH_SIZE
-        for (caption, concept_vector) in data_loader:
+        for (caption, image) in data_loader:
             model.zero_grad()
             # Run our forward pass.
-            scores = model(to_variable(caption))
+            scores = model(to_variable(caption), to_variable(image))
             # Compute the loss, gradients, and update the parameters by calling optimizer.step()
-            loss = loss_function(scores, to_variable(concept_vector))
+            loss = loss_function(scores, to_variable(image))
             loss.backward()
             losses.append(loss.data.cpu().numpy())
             optimizer.step()
