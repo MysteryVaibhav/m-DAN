@@ -29,7 +29,19 @@ class mDAN(torch.nn.Module):
         self.v_0 = self.v_attn.activation(self.v_attn.linear_transform(avg_v))
         self.v_attn.m_v = self.v_0      # Since m_0 = v_0
         v_1 = self.v_attn(i)
-        return h
+
+        # Similarity, will be used to compute loss and do backprop
+        S = torch.sum(self.u_0 * self.v_0, 1) + torch.sum(u_1 * v_1, 1)
+
+        # Repeating the above process for NO_OF_STEPS
+        for steps in range(NO_OF_STEPS-1):
+            self.t_attn.m_u += u_1
+            self.v_attn.m_v += v_1
+            u_1 = self.t_attn(h)
+            v_1 = self.v_attn(i)
+            S += torch.sum(u_1 * v_1, 1)
+
+        return S
 
 
 class biLSTM(torch.nn.Module):
