@@ -1,11 +1,22 @@
 import torch.optim as optim
 import torch.utils.data
+import torch.nn as nn
 import numpy as np
 from model import mDAN
 from timeit import default_timer as timer
 from properties import *
 from util import *
 import sys
+
+
+class margin_loss(nn.Module):
+    def __init__(self):
+        super(margin_loss, self).__init__()
+
+    def forward(self, s):
+        """ s: [n, 1] """
+        loss = (MARGIN - s).clamp(min=0).sum()  #TODO: Add similarity for negative samples
+        return loss
 
 
 def train():
@@ -19,7 +30,7 @@ def train():
 
     model = mDAN(pre_trained_embeddings)
 
-    loss_function = torch.nn.BCELoss()
+    loss_function = margin_loss()
     if torch.cuda.is_available():
         model = model.cuda()
         loss_function = loss_function.cuda()
@@ -31,11 +42,11 @@ def train():
         start_time = timer()
         num_of_mini_batches = NO_OF_IMAGES // BATCH_SIZE
         for (caption, image) in data_loader:
-            model.zero_grad()
+            optimizer.zero_grad()
             # Run our forward pass.
-            scores = model(to_variable(caption), to_variable(image))
+            similarity = model(to_variable(caption), to_variable(image))
             # Compute the loss, gradients, and update the parameters by calling optimizer.step()
-            loss = loss_function(scores, to_variable(image))
+            loss = loss_function(similarity)
             loss.backward()
             losses.append(loss.data.cpu().numpy())
             optimizer.step()

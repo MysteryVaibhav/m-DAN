@@ -25,22 +25,22 @@ class mDAN(torch.nn.Module):
         u_1 = self.t_attn(h)
 
         # Visual Attention
-        avg_v = i.sum(1)*(1/NO_OF_REGIONS_IN_IMAGE)
+        avg_v = to_variable((i.sum(1)*(1/NO_OF_REGIONS_IN_IMAGE)).data, requires_grad=True)
         self.v_0 = self.v_attn.activation(self.v_attn.linear_transform(avg_v))
         self.v_attn.m_v = self.v_0      # Since m_0 = v_0
         v_1 = self.v_attn(i)
 
         # Similarity, will be used to compute loss and do backprop
-        S = torch.sum(self.u_0 * self.v_0, 1) + torch.sum(u_1 * v_1, 1)
+        S = torch.sum(self.u_0 * self.v_0, 1)
+        S = S + torch.sum(u_1 * v_1, 1)
 
         # Repeating the above process for NO_OF_STEPS
         for steps in range(NO_OF_STEPS-1):
-            self.t_attn.m_u += u_1
-            self.v_attn.m_v += v_1
+            self.t_attn.m_u = self.t_attn.m_u + u_1
+            self.v_attn.m_v = self.v_attn.m_v + v_1
             u_1 = self.t_attn(h)
             v_1 = self.v_attn(i)
-            S += torch.sum(u_1 * v_1, 1)
-
+            S = S + torch.sum(u_1 * v_1, 1)
         return S
 
 
@@ -51,7 +51,7 @@ class biLSTM(torch.nn.Module):
         self.hidden_dim = HIDDEN_DIMENSION
         self.word_embeddings = nn.Embedding(VOCAB_SIZE, EMBEDDING_DIMENSION)
         # Assigning pre-trained embeddings as initial weights
-        self.word_embeddings.weight = nn.Parameter(to_tensor(pre_trained_embeddings))
+        self.word_embeddings.weight.data.copy_(torch.from_numpy(pre_trained_embeddings)) # [vocab_size, d]
         self.lstm = nn.LSTM(EMBEDDING_DIMENSION, HIDDEN_DIMENSION, bidirectional=True)
         self.hidden = self.init_hidden()
 
@@ -70,7 +70,7 @@ class biLSTM(torch.nn.Module):
         # clear out the hidden state of the LSTM
         self.hidden = self.init_hidden()
         # Adding the forward and backward embedding as per the paper
-        return to_variable(to_tensor(out_forward + out_backward)).permute(2, 0, 1)  # BATCH_SIZE * MAX_LEN * HIDDEN_DIMENSION
+        return to_variable(to_tensor(out_forward + out_backward), requires_grad=True).permute(2, 0, 1)  # BATCH_SIZE * MAX_LEN * HIDDEN_DIMENSION
 
 
 class T_Att(torch.nn.Module):
@@ -104,6 +104,5 @@ class V_Att(torch.nn.Module):
         h_v = self.activation(self.layer1(v)) * torch.unsqueeze(self.activation(self.layer2(self.m_v)), 1)
         alpha_v = self.linear(h_v)  # BATCH_SIZE * NO_OF_REGIONS_IN_IMAGE * 1
         alpha_v = self.softmax(alpha_v)
-        v = (alpha_v * v).sum(1)     # BATCH_SIZE * VISUAL_FEATURE_DIMENSION
-        return self.activation(self.linear_transform(v))    # Context vector: BATCH_SIZE * EMBEDDING_DIMENSION
+        return self.activation(self.linear_transform((alpha_v * v).sum(1)))    # Context vector: BATCH_SIZE * EMBEDDING_DIMENSION
 
