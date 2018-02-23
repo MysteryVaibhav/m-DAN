@@ -21,15 +21,18 @@ class CustomDataSet(torch.utils.data.TensorDataset):
 
     def __getitem__(self, idx):
         input, mask = self.img_one_hot[self.ids[idx]]
-        return to_tensor(input).long(), to_tensor(mask), to_tensor(np.random.random((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION)))
+        # Return negative caption and image
+        input_neg, mask_neg = self.img_one_hot[self.ids[(idx + 100) % self.num_of_samples]]
+        return to_tensor(input).long(), to_tensor(mask), to_tensor(np.random.random((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))),\
+               to_tensor(input_neg).long(), to_tensor(mask_neg), to_tensor(np.random.random((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION)))
 
 
 class margin_loss(nn.Module):
     def __init__(self):
         super(margin_loss, self).__init__()
 
-    def forward(self, s):
-        loss = (MARGIN - s).clamp(min=0).sum()  #TODO: Add similarity for negative samples
+    def forward(self, s_v, s_v_, s_u_):
+        loss = ((MARGIN - s_v + s_v_).clamp(min=0) + (MARGIN - s_v + s_u_).clamp(min=0)).sum()  #TODO: Add similarity for negative samples
         return loss
 
 
@@ -38,7 +41,6 @@ def train():
     img_one_hot = run()
     train_data_loader = torch.utils.data.DataLoader(CustomDataSet(img_one_hot, get_ids('train')), batch_size=BATCH_SIZE, shuffle=True)
 
-    np.random.seed(123)
     # Get pre-trained embeddings
     pre_trained_embeddings = np.random.random((VOCAB_SIZE, EMBEDDING_DIMENSION))
     pre_trained_embeddings[0, :] = 0
@@ -56,12 +58,14 @@ def train():
         losses = []
         start_time = timer()
         num_of_mini_batches = len(train_data_loader) // BATCH_SIZE
-        for (caption, mask, image) in train_data_loader:
+        for (caption, mask, image, neg_cap, neg_mask, neg_image) in train_data_loader:
             optimizer.zero_grad()
             # Run our forward pass.
             similarity = model(to_variable(caption), to_variable(mask), to_variable(image))
+            similarity_neg_1 = model(to_variable(neg_cap), to_variable(neg_mask), to_variable(image))
+            similarity_neg_2 = model(to_variable(caption), to_variable(mask), to_variable(neg_image))
             # Compute the loss, gradients, and update the parameters by calling optimizer.step()
-            loss = loss_function(similarity)
+            loss = loss_function(similarity, similarity_neg_1, similarity_neg_2)
             loss.backward()
             losses.append(loss.data.cpu().numpy())
             optimizer.step()
