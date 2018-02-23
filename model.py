@@ -6,9 +6,11 @@ from util import to_variable, to_tensor
 
 
 class mDAN(torch.nn.Module):
-    def __init__(self, embeddings):
+    def __init__(self):
         super(mDAN, self).__init__()
         # Create a biLSTM object
+        # Get pre-trained embeddings
+        embeddings = np.random.random((VOCAB_SIZE, EMBEDDING_DIMENSION))
         bi_lstm = biLSTM(embeddings)
         self.text_encoder = bi_lstm
         t_attn = T_Att()

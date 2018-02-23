@@ -22,9 +22,12 @@ class CustomDataSet(torch.utils.data.TensorDataset):
     def __getitem__(self, idx):
         input, mask = self.img_one_hot[self.ids[idx]]
         # Return negative caption and image
+        image = np.load("{}.npy".format(self.ids[idx])).reshape((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
+        image_neg = np.load("{}.npy".format(self.ids[(idx + 100) % self.num_of_samples])).reshape(
+            (NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
         input_neg, mask_neg = self.img_one_hot[self.ids[(idx + 100) % self.num_of_samples]]
-        return to_tensor(input).long(), to_tensor(mask), to_tensor(np.random.random((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))),\
-               to_tensor(input_neg).long(), to_tensor(mask_neg), to_tensor(np.random.random((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION)))
+        return to_tensor(input).long(), to_tensor(mask), to_tensor(image), \
+               to_tensor(input_neg).long(), to_tensor(mask_neg), to_tensor(image_neg)
 
 
 class margin_loss(nn.Module):
@@ -32,20 +35,18 @@ class margin_loss(nn.Module):
         super(margin_loss, self).__init__()
 
     def forward(self, s_v, s_v_, s_u_):
-        loss = ((MARGIN - s_v + s_v_).clamp(min=0) + (MARGIN - s_v + s_u_).clamp(min=0)).sum()  #TODO: Add similarity for negative samples
+        loss = ((MARGIN - s_v + s_v_).clamp(min=0) + (MARGIN - s_v + s_u_).clamp(
+            min=0)).sum()
         return loss
 
 
 def train():
     # Get one-hot for caption for all images:
     img_one_hot = run()
-    train_data_loader = torch.utils.data.DataLoader(CustomDataSet(img_one_hot, get_ids('train')), batch_size=BATCH_SIZE, shuffle=True)
+    train_data_loader = torch.utils.data.DataLoader(CustomDataSet(img_one_hot, get_ids('train')), batch_size=BATCH_SIZE,
+                                                    shuffle=True)
 
-    # Get pre-trained embeddings
-    pre_trained_embeddings = np.random.random((VOCAB_SIZE, EMBEDDING_DIMENSION))
-    pre_trained_embeddings[0, :] = 0
-
-    model = mDAN(pre_trained_embeddings)
+    model = mDAN()
 
     loss_function = margin_loss()
     if torch.cuda.is_available():
@@ -77,7 +78,7 @@ def train():
                 break
         print("Epoch {} : Training Loss: {:.5f}, Time elapsed {:.2f} mins"
               .format(epoch, np.asscalar(np.mean(losses)), (timer() - start_time) / 60))
-    torch.save(model.state_dict(), 'model_weights_{}.t7'.format(HIDDEN_DIMENSION))
+    torch.save(model.state_dict(), 'model_weights_{}.t7'.format(epoch))
 
 
 if __name__ == '__main__':

@@ -9,6 +9,7 @@ def get_captions():
             split_line = lines.split("\t")
             img_id, img_caption_id = split_line[0].split("#")
             caption = split_line[1]
+            img_id = img_id.replace(".jpg", "")
             if img_id not in img_to_caption:
                 img_to_caption[img_id] = []
             img_to_caption[img_id].append(caption.replace("\n", "").lower())
@@ -84,7 +85,7 @@ def get_ids(name):
     list = []
     with open("C:\\Users\\myste\\Downloads\\split\\{}.lst".format(name), 'r', encoding='utf=8') as f:
         for id in f.readlines():
-            list.append(id.split("/")[1].replace("\n", ""))
+            list.append(id.split("/")[1].replace("\n", "").replace(".jpg", ""))
     return list
 
 
