@@ -6,23 +6,23 @@ from util import to_variable, to_tensor
 
 
 class mDAN(torch.nn.Module):
-    def __init__(self, pre_trained_embeddings):
+    def __init__(self, embeddings):
         super(mDAN, self).__init__()
         # Create a biLSTM object
-        bi_lstm = biLSTM(pre_trained_embeddings)
+        bi_lstm = biLSTM(embeddings)
         self.text_encoder = bi_lstm
         t_attn = T_Att()
         self.t_attn = t_attn
         v_attn = V_Att()
         self.v_attn = v_attn
 
-    def forward(self, input_caption, input_image):
+    def forward(self, input_caption, mask, input_image):
         h = self.text_encoder(input_caption)
         i = input_image
         # Textual Attention
-        self.u_0 = h.sum(1)*(1/MAX_CAPTION_LEN)     # Take care of masking here
+        self.u_0 = h.sum(1)/torch.unsqueeze(torch.sum(mask, dim=1), 1)     # Take care of masking here
         self.t_attn.m_u = self.u_0      # Since m_0 = u_0
-        u_1 = self.t_attn(h)
+        u_1 = self.t_attn(h, mask)
 
         # Visual Attention
         avg_v = to_variable((i.sum(1)*(1/NO_OF_REGIONS_IN_IMAGE)).data, requires_grad=True)
@@ -38,20 +38,20 @@ class mDAN(torch.nn.Module):
         for steps in range(NO_OF_STEPS-1):
             self.t_attn.m_u = self.t_attn.m_u + u_1
             self.v_attn.m_v = self.v_attn.m_v + v_1
-            u_1 = self.t_attn(h)
+            u_1 = self.t_attn(h, mask)
             v_1 = self.v_attn(i)
             S = S + torch.sum(u_1 * v_1, 1)
         return S
 
 
 class biLSTM(torch.nn.Module):
-    def __init__(self, pre_trained_embeddings):
+    def __init__(self, embeddings):
         super(biLSTM, self).__init__()
         self.batch_size = BATCH_SIZE
         self.hidden_dim = HIDDEN_DIMENSION
         self.word_embeddings = nn.Embedding(VOCAB_SIZE, EMBEDDING_DIMENSION)
         # Assigning pre-trained embeddings as initial weights
-        self.word_embeddings.weight.data.copy_(torch.from_numpy(pre_trained_embeddings)) # [vocab_size, d]
+        self.word_embeddings.weight.data.copy_(to_tensor(embeddings))
         self.lstm = nn.LSTM(EMBEDDING_DIMENSION, HIDDEN_DIMENSION, bidirectional=True)
         self.hidden = self.init_hidden()
 
@@ -82,10 +82,10 @@ class T_Att(torch.nn.Module):
         self.linear = nn.Linear(in_features=EMBEDDING_DIMENSION, out_features=1)
         self.softmax = nn.Softmax()
 
-    def forward(self, u):
+    def forward(self, u, mask):
         h_u = self.activation(self.layer1(u)) * torch.unsqueeze(self.activation(self.layer2(self.m_u)), 1)
-        alpha_u = self.linear(h_u)  # BATCH_SIZE * MAX_LEN * 1
-        # TODO: do masking before taking softmax to nullify padding
+        alpha_u = self.linear(h_u) * torch.unsqueeze(mask, 2)  # BATCH_SIZE * MAX_LEN * 1
+        # masking before taking softmax to nullify padding
         alpha_u = self.softmax(alpha_u)
         return (alpha_u * u).sum(1)     # Context vector: BATCH_SIZE * HIDDEN_DIMENSION
 

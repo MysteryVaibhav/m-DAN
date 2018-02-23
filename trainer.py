@@ -7,6 +7,21 @@ from timeit import default_timer as timer
 from properties import *
 from util import *
 import sys
+from process_data import run, get_ids
+
+
+class CustomDataSet(torch.utils.data.TensorDataset):
+    def __init__(self, img_one_hot, ids):
+        self.img_one_hot = img_one_hot
+        self.ids = ids
+        self.num_of_samples = len(ids)
+
+    def __len__(self):
+        return self.num_of_samples
+
+    def __getitem__(self, idx):
+        input, mask = self.img_one_hot[self.ids[idx]]
+        return to_tensor(input).long(), to_tensor(mask), to_tensor(np.random.random((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION)))
 
 
 class margin_loss(nn.Module):
@@ -14,19 +29,19 @@ class margin_loss(nn.Module):
         super(margin_loss, self).__init__()
 
     def forward(self, s):
-        """ s: [n, 1] """
         loss = (MARGIN - s).clamp(min=0).sum()  #TODO: Add similarity for negative samples
         return loss
 
 
 def train():
-    dataset = torch.utils.data.TensorDataset(torch.LongTensor(np.zeros((NO_OF_IMAGES, MAX_CAPTION_LEN))),
-                                                     to_tensor(np.random.random((NO_OF_IMAGES,
-                                                                                NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))))
-    data_loader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
+    # Get one-hot for caption for all images:
+    img_one_hot = run()
+    train_data_loader = torch.utils.data.DataLoader(CustomDataSet(img_one_hot, get_ids('train')), batch_size=BATCH_SIZE, shuffle=True)
 
+    np.random.seed(123)
     # Get pre-trained embeddings
     pre_trained_embeddings = np.random.random((VOCAB_SIZE, EMBEDDING_DIMENSION))
+    pre_trained_embeddings[0, :] = 0
 
     model = mDAN(pre_trained_embeddings)
 
@@ -40,11 +55,11 @@ def train():
         minibatch = 1
         losses = []
         start_time = timer()
-        num_of_mini_batches = NO_OF_IMAGES // BATCH_SIZE
-        for (caption, image) in data_loader:
+        num_of_mini_batches = len(train_data_loader) // BATCH_SIZE
+        for (caption, mask, image) in train_data_loader:
             optimizer.zero_grad()
             # Run our forward pass.
-            similarity = model(to_variable(caption), to_variable(image))
+            similarity = model(to_variable(caption), to_variable(mask), to_variable(image))
             # Compute the loss, gradients, and update the parameters by calling optimizer.step()
             loss = loss_function(similarity)
             loss.backward()
