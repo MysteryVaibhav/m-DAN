@@ -104,13 +104,12 @@ def train():
             minibatch += 1
         print("Epoch {} : Training Loss: {:.5f}, Time elapsed {:.2f} mins"
               .format(epoch, np.asscalar(np.mean(losses)), (timer() - start_time) / 60))
-        if (epoch + 1) % 5 == 0:
-            r_at_1 = recall_at_1(model, val_data_loader)
-            print("R@1 after {} epochs: {}".format(epoch + 1, r_at_1))
-            if r_at_1 > prev_best:
-                print("Recall at 1 increased....saving weights !!")
-                prev_best = r_at_1
-                torch.save(model.state_dict(), 'model_weights_{}_{}.t7'.format(epoch+1, r_at_1))
+        r_at_1 = recall_at_1(model, val_data_loader)
+        print("R@1 after {} epochs: {}".format(epoch + 1, r_at_1))
+        if r_at_1 > prev_best:
+            print("Recall at 1 increased....saving weights !!")
+            prev_best = r_at_1
+            torch.save(model.state_dict(), 'model_weights_{}_{}.t7'.format(epoch+1, r_at_1))
 
 
 if __name__ == '__main__':
