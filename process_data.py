@@ -1,10 +1,11 @@
 import numpy as np
+from properties import *
 
 
 # Returns a dictionary of image_id -> Caption (All 5 concatenated)
 def get_captions():
     img_to_caption = {}
-    with open("/data/disk1/junweil/vision_language/data/flickr30k/results_20130124.token", 'r', encoding='utf-8') as caption_data:
+    with open(CAPTION_INFO, 'r', encoding='utf-8') as caption_data:
         for lines in caption_data.readlines():
             split_line = lines.split("\t")
             img_id, img_caption_id = split_line[0].split("#")
@@ -83,7 +84,7 @@ def run():
 
 def get_ids(name):
     list = []
-    with open("/data/disk1/junweil/vision_language/data/flickr30k/splits/{}.lst".format(name), 'r', encoding='utf=8') as f:
+    with open(SPLIT_INFO + "{}.lst".format(name), 'r', encoding='utf=8') as f:
         for id in f.readlines():
             list.append(id.split("/")[1].replace("\n", "").replace(".jpg", ""))
     return list

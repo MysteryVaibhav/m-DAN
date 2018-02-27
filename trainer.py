@@ -25,12 +25,12 @@ class CustomDataSet(torch.utils.data.TensorDataset):
         input, mask = self.img_one_hot[self.ids[idx]]
 
         #image = np.random.random((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
-        image = np.load("/data/disk1/junweil/vision_language/data/flickr30k/resnet-101/{}.npy".format(self.ids[idx])).reshape((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
+        image = np.load(TRAIN_IMAGES_DIR + "{}.npy".format(self.ids[idx])).reshape((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
         if not self.is_train:
             return to_tensor(input).long(), to_tensor(mask), to_tensor(image)
 
         # Return negative caption and image
-        image_neg = np.load("/data/disk1/junweil/vision_language/data/flickr30k/resnet-101/{}.npy".format(self.ids[(idx + 100) % self.num_of_samples])).reshape((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
+        image_neg = np.load(TRAIN_IMAGES_DIR + "{}.npy".format(self.ids[(idx + 100) % self.num_of_samples])).reshape((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
         #image_neg = np.random.random((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
 
         input_neg, mask_neg = self.img_one_hot[self.ids[(idx + 100) % self.num_of_samples]]
