@@ -18,9 +18,10 @@ class mDAN(torch.nn.Module):
         v_attn = V_Att()
         self.v_attn = v_attn
 
-    def forward(self, input_caption, mask, input_image):
+    def forward(self, input_caption, mask, input_image, is_inference):
         h = self.text_encoder(input_caption)
         i = input_image
+
         # Textual Attention
         self.u_0 = h.sum(1)/torch.unsqueeze(torch.sum(mask, dim=1), 1)     # Take care of masking here
         self.t_attn.m_u = self.u_0      # Since m_0 = u_0
@@ -32,6 +33,13 @@ class mDAN(torch.nn.Module):
         self.v_attn.m_v = self.v_0      # Since m_0 = v_0
         v_1 = self.v_attn(i)
 
+        # Creating similarity vectors for inference
+        if is_inference:
+            z_u = to_variable(self.u_0.data, requires_grad=False)
+            z_v = to_variable(self.v_0.data, requires_grad=False)
+            z_u = z_u.cat((z_u, u_1), 1)
+            z_v = z_v.cat((z_v, v_1), 1)
+
         # Similarity, will be used to compute loss and do backprop
         S = torch.sum(self.u_0 * self.v_0, 1)
         S = S + torch.sum(u_1 * v_1, 1)
@@ -42,7 +50,12 @@ class mDAN(torch.nn.Module):
             self.v_attn.m_v = self.v_attn.m_v + v_1
             u_1 = self.t_attn(h, mask)
             v_1 = self.v_attn(i)
+            if is_inference:
+                z_u = z_u.cat((z_u, u_1), 1)
+                z_v = z_v.cat((z_v, v_1), 1)
             S = S + torch.sum(u_1 * v_1, 1)
+        if is_inference:
+            return S, z_u, z_v
         return S
 
 
@@ -55,7 +68,6 @@ class biLSTM(torch.nn.Module):
         # Assigning pre-trained embeddings as initial weights
         self.word_embeddings.weight.data.copy_(to_tensor(embeddings))
         self.lstm = nn.LSTM(EMBEDDING_DIMENSION, HIDDEN_DIMENSION, bidirectional=True)
-        self.hidden = self.init_hidden()
 
     def init_hidden(self):
         # Assigning initial hidden and cell state
@@ -65,14 +77,17 @@ class biLSTM(torch.nn.Module):
 
     def forward(self, sentence):
         embeds = self.word_embeddings(sentence)
+        self.batch_size = embeds.size()[0]
+        # clear out the hidden state of the LSTM
+        self.hidden = self.init_hidden()
+
         lstm_out, self.hidden = self.lstm(
             embeds.view(MAX_CAPTION_LEN, self.batch_size, -1), self.hidden)
         # lstm_out: MAX_LEN * BATCH_SIZE * (2*EMBEDDING_DIMENSION)
-        out_forward, out_backward = np.hsplit(lstm_out.data.permute(0, 2, 1).cpu().numpy(), 2)
-        # clear out the hidden state of the LSTM
-        self.hidden = self.init_hidden()
+        out_forward = lstm_out[:MAX_CAPTION_LEN, :self.batch_size, :HIDDEN_DIMENSION]
+        out_backward = lstm_out[:MAX_CAPTION_LEN, :self.batch_size, HIDDEN_DIMENSION:]
         # Adding the forward and backward embedding as per the paper
-        return to_variable(to_tensor(out_forward + out_backward), requires_grad=True).permute(2, 0, 1)  # BATCH_SIZE * MAX_LEN * HIDDEN_DIMENSION
+        return (out_forward + out_backward).permute(1, 0, 2)  # BATCH_SIZE * MAX_LEN * HIDDEN_DIMENSION
 
 
 class T_Att(torch.nn.Module):
