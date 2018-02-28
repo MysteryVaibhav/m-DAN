@@ -57,6 +57,15 @@ def recall_at_1(model, val_data_loader):
     return r_at_1 / 1000
 
 
+def init_xavier(m):
+    if type(m) == torch.nn.Linear:
+        fan_in = m.weight.size()[1]
+        fan_out = m.weight.size()[0]
+        std = np.sqrt(6.0 / (fan_in + fan_out))
+        m.weight.data.normal_(0, std)
+        m.bias.data.zero_()
+
+
 class margin_loss(nn.Module):
     def __init__(self):
         super(margin_loss, self).__init__()
@@ -74,16 +83,17 @@ def train():
     train_data_loader = torch.utils.data.DataLoader(CustomDataSet(img_one_hot, train_ids, True), batch_size=BATCH_SIZE,
                                                     shuffle=True)
     val_data_loader = torch.utils.data.DataLoader(CustomDataSet(img_one_hot, get_ids('val'), False), batch_size=BATCH_SIZE,
-                                                    shuffle=True)
+                                                    shuffle=False)
 
     model = mDAN()
-
+    model.apply(init_xavier)
     loss_function = margin_loss()
     if torch.cuda.is_available():
         model = model.cuda()
         loss_function = loss_function.cuda()
-    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, nesterov=True, weight_decay=0.0005)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
+    #optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, nesterov=True, weight_decay=0.0005)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.0001)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=60, gamma=0.1)
     prev_best = 0
     for epoch in range(EPOCHS):
         scheduler.step()
