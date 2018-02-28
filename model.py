@@ -10,7 +10,7 @@ class mDAN(torch.nn.Module):
         super(mDAN, self).__init__()
         # Create a biLSTM object
         # Get pre-trained embeddings
-        embeddings = np.random.random((VOCAB_SIZE, EMBEDDING_DIMENSION))
+        embeddings = np.random.uniform(-1, 1, (VOCAB_SIZE, EMBEDDING_DIMENSION))
         bi_lstm = biLSTM(embeddings)
         self.text_encoder = bi_lstm
         t_attn = T_Att()
@@ -23,7 +23,7 @@ class mDAN(torch.nn.Module):
         i = input_image
 
         # Textual Attention
-        self.u_0 = h.sum(1)/torch.unsqueeze(torch.sum(mask, dim=1), 1)     # Take care of masking here
+        self.u_0 = h.sum(1)/torch.unsqueeze(torch.clamp(torch.sum(mask, dim=1), min=1), 1)     # Take care of masking here
         self.t_attn.m_u = self.u_0      # Since m_0 = u_0
         u_1 = self.t_attn(h, mask)
 

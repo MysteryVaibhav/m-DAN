@@ -23,17 +23,19 @@ class CustomDataSet(torch.utils.data.TensorDataset):
 
     def __getitem__(self, idx):
         input, mask = self.img_one_hot[self.ids[idx]]
-
+        
         #image = np.random.random((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
         image = np.load(TRAIN_IMAGES_DIR + "{}.npy".format(self.ids[idx])).reshape((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
         if not self.is_train:
             return to_tensor(input).long(), to_tensor(mask), to_tensor(image)
-
+        r_n = idx
+        while r_n == idx:
+            r_n = np.random.randint(self.num_of_samples)
         # Return negative caption and image
-        image_neg = np.load(TRAIN_IMAGES_DIR + "{}.npy".format(self.ids[(idx + 100) % self.num_of_samples])).reshape((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
+        image_neg = np.load(TRAIN_IMAGES_DIR + "{}.npy".format(self.ids[r_n])).reshape((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
         #image_neg = np.random.random((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
 
-        input_neg, mask_neg = self.img_one_hot[self.ids[(idx + 100) % self.num_of_samples]]
+        input_neg, mask_neg = self.img_one_hot[self.ids[r_n]]
         return to_tensor(input).long(), to_tensor(mask), to_tensor(image), \
                to_tensor(input_neg).long(), to_tensor(mask_neg), to_tensor(image_neg)
 
@@ -44,15 +46,15 @@ def recall_at_1(model, val_data_loader):
     for (caption, mask, image) in val_data_loader:
         _, z_u, z_v = model(to_variable(caption), to_variable(mask), to_variable(image), True)
         if all_z_u is None:
-            all_z_u = z_u
-            all_z_v = z_v
+            all_z_u = z_u.data.cpu()
+            all_z_v = z_v.data.cpu()
         else:
-            all_z_u = torch.cat((all_z_u, z_u), 0)
-            all_z_v = torch.cat((all_z_v, z_v), 0)
+            all_z_u = torch.cat((all_z_u, z_u.data.cpu()), 0)
+            all_z_v = torch.cat((all_z_v, z_v.data.cpu()), 0)
     similarity_matrix = torch.mm(all_z_u, all_z_v.t())
     max, _ = torch.max(similarity_matrix, 1)
     r_at_1 = torch.sum(torch.diag(similarity_matrix, 0) == max)
-    return r_at_1.data.cpu()[0] / 1000
+    return r_at_1 / 1000
 
 
 class margin_loss(nn.Module):
@@ -80,9 +82,11 @@ def train():
     if torch.cuda.is_available():
         model = model.cuda()
         loss_function = loss_function.cuda()
-    optimizer = optim.SGD(model.parameters(), lr=0.1)
+    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, nesterov=True, weight_decay=0.0005)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
     prev_best = 0
     for epoch in range(EPOCHS):
+        scheduler.step()
         minibatch = 1
         losses = []
         start_time = timer()
