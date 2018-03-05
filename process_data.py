@@ -2,10 +2,19 @@ import numpy as np
 from properties import *
 
 
+def normalize(v):
+    norm = np.linalg.norm(v)
+    if norm == 0:
+       return v
+    return v / norm
+
+
 # Returns a dictionary of image_id -> Caption (All 5 concatenated)
 def get_captions():
     img_to_caption = {}
+    id_img = {}
     with open(CAPTION_INFO, 'r', encoding='utf-8') as caption_data:
+        i = 0
         for lines in caption_data.readlines():
             split_line = lines.split("\t")
             img_id, img_caption_id = split_line[0].split("#")
@@ -13,9 +22,11 @@ def get_captions():
             img_id = img_id.replace(".jpg", "")
             if img_id not in img_to_caption:
                 img_to_caption[img_id] = []
+                id_img[i] = img_id
+                i += 1
             img_to_caption[img_id].append(caption.replace("\n", "").lower())
     img_to_caption, max_len = concatenate_all_captions(img_to_caption)
-    return img_to_caption, max_len
+    return img_to_caption, max_len, id_img
 
 
 def concatenate_all_captions(img_to_caption):
@@ -48,7 +59,7 @@ def frequency_map(img_caption):
 
 
 def construct_vocab(word_freq, k):
-    word_idx= {}
+    word_idx = {}
     for word, freq in word_freq.items():
         if freq >= k:
             if word not in word_idx:
@@ -56,25 +67,29 @@ def construct_vocab(word_freq, k):
     return word_idx
 
 
+def encode_caption(caption, word_idx, max_len):
+    one_hot = np.zeros(max_len)
+    for i in range(len(caption)):
+        if caption[i] in word_idx:
+            one_hot[i] = word_idx[caption[i]] + 2
+        else:
+            # Idx 1 for unknown words
+            one_hot[i] = 1
+            # Idx 0 for padding
+    mask = np.ones(max_len)
+    mask[i:] = 0
+    return one_hot, mask
+
+
 def img_caption_one_hot(img_caption, word_idx, max_len):
     img_to_one_hot = {}
     for img, caption in img_caption.items():
-        one_hot = np.zeros(max_len)
-        for i in range(len(caption)):
-            if caption[i] in word_idx:
-                one_hot[i] = word_idx[caption[i]] + 2
-            else:
-                # Idx 1 for unknown words
-                one_hot[i] = 1
-            # Idx 0 for padding
-        mask = np.ones(max_len)
-        mask[i:] = 0
-        img_to_one_hot[img] = (one_hot, mask)
+        img_to_one_hot[img] = encode_caption(caption, word_idx, max_len)
     return img_to_one_hot
 
 
 def run():
-    img_caption, max_len = get_captions()
+    img_caption, max_len, _ = get_captions()
     word_freq = frequency_map(img_caption)
     word_idx = construct_vocab(word_freq, 5)
     print("Total words in vocabulary: {}".format(len(word_idx) + 2))

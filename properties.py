@@ -22,3 +22,4 @@ MARGIN = 100
 TRAIN_IMAGES_DIR = '/data/disk1/junweil/vision_language/data/flickr30k/resnet-101_avg/'
 CAPTION_INFO = '/data/disk1/junweil/vision_language/data/flickr30k/results_20130124.token'
 SPLIT_INFO = '/data/disk1/junweil/vision_language/data/flickr30k/splits/'
+IMAGES_DIR = '/data/disk1/junweil/vision_language/data/flickr30k/flickr30k_images/'
