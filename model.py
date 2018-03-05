@@ -12,8 +12,8 @@ class mDAN(torch.nn.Module):
         # Create a biLSTM object
         # Get pre-trained embeddings
         embeddings = np.random.uniform(-1, 1, (VOCAB_SIZE, EMBEDDING_DIMENSION))
-        bi_lstm = biLSTM(embeddings)
-        self.text_encoder = bi_lstm
+        self.bi_lstm = biLSTM(embeddings)
+        self.text_encoder = self.bi_lstm
         t_attn = T_Att()
         self.t_attn = t_attn
         v_attn = V_Att()
@@ -78,11 +78,12 @@ class biLSTM(torch.nn.Module):
         # clear out the hidden state of the LSTM
         self.hidden = self.init_hidden()
 
-        lstm_out, self.hidden = self.lstm(
-            embeds.view(MAX_CAPTION_LEN, self.batch_size, -1), self.hidden)
-        # lstm_out: MAX_LEN * BATCH_SIZE * (2*EMBEDDING_DIMENSION)
-        out_forward = lstm_out[:MAX_CAPTION_LEN, :self.batch_size, :HIDDEN_DIMENSION]
-        out_backward = lstm_out[:MAX_CAPTION_LEN, :self.batch_size, HIDDEN_DIMENSION:]
+        outputs = to_variable(to_tensor(np.zeros((MAX_CAPTION_LEN, self.batch_size, self.hidden_dim * 2))))
+        for seq in range(MAX_CAPTION_LEN):
+            outputs[seq], self.hidden = self.lstm(embeds[:, seq, :].contiguous().view(1, self.batch_size, -1), self.hidden)
+
+        out_forward = outputs[:MAX_CAPTION_LEN, :self.batch_size, :self.hidden_dim]
+        out_backward = outputs[:MAX_CAPTION_LEN, :self.batch_size, self.hidden_dim:]
         # Adding the forward and backward embedding as per the paper
         return (out_forward + out_backward).permute(1, 0, 2)  # BATCH_SIZE * MAX_LEN * HIDDEN_DIMENSION
 

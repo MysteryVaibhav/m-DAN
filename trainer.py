@@ -28,7 +28,7 @@ class CustomDataSet(torch.utils.data.TensorDataset):
         image = np.load(TRAIN_IMAGES_DIR + "{}.npy".format(self.ids[idx])).reshape((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
         if not self.is_train:
             return to_tensor(input).long(), to_tensor(mask), to_tensor(image)
-        r_n = idx
+        r_n = idx 
         while r_n == idx:
             r_n = np.random.randint(self.num_of_samples)
         # Return negative caption and image
@@ -91,9 +91,11 @@ def train():
     if torch.cuda.is_available():
         model = model.cuda()
         loss_function = loss_function.cuda()
+    #model.load_state_dict(torch.load('model_weights_33_0.01.t7'))
     #optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, nesterov=True, weight_decay=0.0005)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.0001)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=60, gamma=0.1)
+    #optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.0001)
+    optimizer = torch.optim.Adadelta(model.parameters(), lr=0.1, weight_decay=0.0001)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.1)
     prev_best = 0
     for epoch in range(EPOCHS):
         scheduler.step()
