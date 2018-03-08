@@ -10,7 +10,7 @@ def normalize(v):
 
 
 # Returns a dictionary of image_id -> Caption (All 5 concatenated)
-def get_captions():
+def get_captions(to_concatenate=True):
     img_to_caption = {}
     id_img = {}
     with open(CAPTION_INFO, 'r', encoding='utf-8') as caption_data:
@@ -25,7 +25,10 @@ def get_captions():
                 id_img[i] = img_id
                 i += 1
             img_to_caption[img_id].append(caption.replace("\n", "").lower())
-    img_to_caption, max_len = concatenate_all_captions(img_to_caption)
+    if to_concatenate:
+        img_to_caption, max_len = concatenate_all_captions(img_to_caption)
+    else:
+        max_len = MAX_CAPTION_LEN
     return img_to_caption, max_len, id_img
 
 

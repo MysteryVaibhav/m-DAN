@@ -95,7 +95,7 @@ def train():
     #optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, nesterov=True, weight_decay=0.0005)
     #optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.0001)
     optimizer = torch.optim.Adadelta(model.parameters(), lr=0.1, weight_decay=0.0001)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.1)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
     prev_best = 0
     for epoch in range(EPOCHS):
         scheduler.step()
@@ -125,7 +125,7 @@ def train():
         if r_at_1 > prev_best:
             print("Recall at 1 increased....saving weights !!")
             prev_best = r_at_1
-            torch.save(model.state_dict(), 'model_weights_{}_{}.t7'.format(epoch+1, r_at_1))
+            torch.save(model.state_dict(), 'model_weights_full_{}_{}.t7'.format(epoch+1, r_at_1))
 
 
 if __name__ == '__main__':
