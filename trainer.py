@@ -25,36 +25,95 @@ class CustomDataSet(torch.utils.data.TensorDataset):
         input, mask = self.img_one_hot[self.ids[idx]]
         
         #image = np.random.random((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
-        image = np.load(TRAIN_IMAGES_DIR + "{}.npy".format(self.ids[idx])).reshape((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
+        image = np.load(TRAIN_IMAGES_DIR + "{}.npy".format(self.ids[idx].split("#")[0])).reshape((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
         if not self.is_train:
             return to_tensor(input).long(), to_tensor(mask), to_tensor(image)
-        r_n = idx 
-        while r_n == idx:
+        r_n = idx
+        img_idx = self.ids[idx].split("#")[0]
+        r_n_idx = img_idx
+        while r_n_idx == img_idx:
             r_n = np.random.randint(self.num_of_samples)
+            r_n_idx = self.ids[r_n].split("#")[0]
         # Return negative caption and image
-        image_neg = np.load(TRAIN_IMAGES_DIR + "{}.npy".format(self.ids[r_n])).reshape((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
+
+        image_neg = np.load(TRAIN_IMAGES_DIR + "{}.npy".format(self.ids[r_n].split("#")[0])).reshape((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
         #image_neg = np.random.random((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
 
         input_neg, mask_neg = self.img_one_hot[self.ids[r_n]]
         return to_tensor(input).long(), to_tensor(mask), to_tensor(image), \
                to_tensor(input_neg).long(), to_tensor(mask_neg), to_tensor(image_neg)
 
+class CustomDataSet1(torch.utils.data.TensorDataset):
+    def __init__(self, test_ids):
+        self.ids = test_ids
+        self.num_of_samples = len(self.ids)
 
-def recall_at_1(model, val_data_loader):
-    all_z_u = None
-    all_z_v = None
-    for (caption, mask, image) in val_data_loader:
-        _, z_u, z_v = model(to_variable(caption), to_variable(mask), to_variable(image), True)
-        if all_z_u is None:
-            all_z_u = z_u.data.cpu()
-            all_z_v = z_v.data.cpu()
+    def __len__(self):
+        return self.num_of_samples
+
+    def __getitem__(self, idx):
+        #image = np.random.random((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
+        image = np.load(TRAIN_IMAGES_DIR + "{}.npy".format(self.ids[idx])).reshape((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
+        dummy_one_hot = np.ones(MAX_CAPTION_LEN)
+        dummy_mask = np.ones(MAX_CAPTION_LEN)
+        return to_tensor(dummy_one_hot).long(), to_tensor(dummy_mask), to_tensor(image)
+
+
+class CustomDataSet2(torch.utils.data.TensorDataset):
+    def __init__(self, img_one_hot, val_ids):
+        self.img_one_hot = img_one_hot
+        self.ids = val_ids
+        self.num_of_samples = len(self.ids)
+
+    def __len__(self):
+        return self.num_of_samples
+
+    def __getitem__(self, idx):
+        dummy_image = np.random.random((NO_OF_REGIONS_IN_IMAGE, VISUAL_FEATURE_DIMENSION))
+        dummy_one_hot, dummy_mask = self.img_one_hot[self.ids[idx]]
+        return to_tensor(dummy_one_hot).long(), to_tensor(dummy_mask), to_tensor(dummy_image), self.ids[idx].split("#")[0]
+
+
+def recall(model, img_one_hot):
+    test_z_v = None  # no_of_images * visual_context_features
+    plain_val_ids = get_ids('val', strip=True)
+    data_loader = torch.utils.data.DataLoader(CustomDataSet1(plain_val_ids), batch_size=BATCH_SIZE, shuffle=False)
+    for (caption_, mask_, image_) in data_loader:
+        _, _, z_v = model(to_variable(caption_),
+                          to_variable(mask_),
+                          to_variable(image_), True)
+        if test_z_v is None:
+            test_z_v = z_v.data.cpu()
         else:
-            all_z_u = torch.cat((all_z_u, z_u.data.cpu()), 0)
-            all_z_v = torch.cat((all_z_v, z_v.data.cpu()), 0)
-    similarity_matrix = torch.mm(all_z_u, all_z_v.t())
-    max, _ = torch.max(similarity_matrix, 1)
-    r_at_1 = torch.sum(torch.diag(similarity_matrix, 0) == max)
-    return r_at_1 / 1000
+            test_z_v = torch.cat((test_z_v, z_v.data.cpu()), 0)
+    test_z_v = test_z_v.numpy()
+
+    val_ids = get_ids('val')
+    data_loader = torch.utils.data.DataLoader(CustomDataSet2(img_one_hot, val_ids), batch_size=BATCH_SIZE, shuffle=False)
+    r_1 = 0
+    r_5 = 0
+    r_10 = 0
+    for (caption_, mask_, image_, label) in data_loader:
+        _, z_u, _ = model(to_variable(caption_),
+                          to_variable(mask_),
+                          to_variable(image_), True)
+        z_u = z_u.data.cpu().numpy()
+
+        # Compute similarity with the existing images
+        similarity = np.matmul(test_z_v, z_u.T)
+        for column in range(similarity.shape[1]):
+            top_10_img_idx = (-similarity[:, column]).argsort()[:10]
+            if label[column] == plain_val_ids[top_10_img_idx[0]]:
+                r_1 += 1
+                r_5 += 1
+                r_10 += 1
+            elif label[column] in [plain_val_ids[x] for x in top_10_img_idx[1:5]]:
+                r_5 += 1
+                r_10 += 1
+            elif label[column] in [plain_val_ids[x] for x in top_10_img_idx[6:10]]:
+                r_10 += 1
+
+    return r_1 / len(val_ids), r_5 / len(val_ids), r_10 / len(val_ids)
 
 
 def init_xavier(m):
@@ -82,16 +141,13 @@ def train():
     train_ids = get_ids('train')
     train_data_loader = torch.utils.data.DataLoader(CustomDataSet(img_one_hot, train_ids, True), batch_size=BATCH_SIZE,
                                                     shuffle=True)
-    val_data_loader = torch.utils.data.DataLoader(CustomDataSet(img_one_hot, get_ids('val'), False), batch_size=BATCH_SIZE,
-                                                    shuffle=False)
-
     model = mDAN()
     model.apply(init_xavier)
     loss_function = margin_loss()
     if torch.cuda.is_available():
         model = model.cuda()
         loss_function = loss_function.cuda()
-    #model.load_state_dict(torch.load('model_weights_33_0.01.t7'))
+    model.load_state_dict(torch.load('model_weights_ind_40_0.1942.t7'))
     #optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, nesterov=True, weight_decay=0.0005)
     #optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.0001)
     optimizer = torch.optim.Adadelta(model.parameters(), lr=0.1, weight_decay=0.0001)
@@ -118,14 +174,13 @@ def train():
                 minibatch, num_of_mini_batches, np.asscalar(np.mean(losses))))
             sys.stdout.flush()
             minibatch += 1
-        print("Epoch {} : Training Loss: {:.5f}, Time elapsed {:.2f} mins"
-              .format(epoch, np.asscalar(np.mean(losses)), (timer() - start_time) / 60))
-        r_at_1 = recall_at_1(model, val_data_loader)
-        print("R@1 after {} epochs: {}".format(epoch + 1, r_at_1))
+        r_at_1, r_at_5, r_at_10 = recall(model, img_one_hot)
+        print("Epoch {} : Training Loss: {:.5f}, R@1 : {}, R@5 : {}, R@10 : {}, Time elapsed {:.2f} mins"
+              .format(epoch, np.asscalar(np.mean(losses)), r_at_1, r_at_5, r_at_10, (timer() - start_time) / 60))
         if r_at_1 > prev_best:
             print("Recall at 1 increased....saving weights !!")
             prev_best = r_at_1
-            torch.save(model.state_dict(), 'model_weights_full_{}_{}.t7'.format(epoch+1, r_at_1))
+            torch.save(model.state_dict(), 'model_weights_ind_{}_{}.t7'.format(epoch+1, r_at_1))
 
 
 if __name__ == '__main__':

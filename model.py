@@ -11,8 +11,8 @@ class mDAN(torch.nn.Module):
         super(mDAN, self).__init__()
         # Create a biLSTM object
         # Get pre-trained embeddings
-        embeddings = np.random.uniform(-1, 1, (VOCAB_SIZE, EMBEDDING_DIMENSION))
-        self.bi_lstm = biLSTM(embeddings)
+        #embeddings = np.random.uniform(-1, 1, (VOCAB_SIZE, EMBEDDING_DIMENSION))
+        self.bi_lstm = biLSTM()
         self.text_encoder = self.bi_lstm
         t_attn = T_Att()
         self.t_attn = t_attn
@@ -57,13 +57,14 @@ class mDAN(torch.nn.Module):
 
 
 class biLSTM(torch.nn.Module):
-    def __init__(self, embeddings):
+    def __init__(self):
         super(biLSTM, self).__init__()
         self.batch_size = BATCH_SIZE
         self.hidden_dim = HIDDEN_DIMENSION
         self.word_embeddings = nn.Embedding(VOCAB_SIZE, EMBEDDING_DIMENSION)
         # Assigning pre-trained embeddings as initial weights
-        self.word_embeddings.weight.data.copy_(to_tensor(embeddings))
+        #self.word_embeddings.weight.data.copy_(to_tensor(embeddings))
+        nn.init.xavier_uniform(self.word_embeddings.weight)
         self.lstm = nn.LSTM(EMBEDDING_DIMENSION, HIDDEN_DIMENSION, bidirectional=True)
 
     def init_hidden(self):
