@@ -42,6 +42,31 @@ class CustomDataSet(torch.utils.data.TensorDataset):
         input_neg, mask_neg = self.img_one_hot[self.ids[r_n]]
         return to_tensor(input).long(), to_tensor(mask), to_tensor(image), \
                to_tensor(input_neg).long(), to_tensor(mask_neg), to_tensor(image_neg)
+        
+        
+def get_k_random_numbers(n, curr, k=16):
+    random_indices = set()
+    while len(random_indices) < k:
+        idx = np.random.randint(n)
+        if idx != curr and idx not in random_indices:
+            random_indices.add(idx)
+    return list(random_indices)
+
+
+def hard_negative_mining(model, pos_cap, pos_mask, pos_image, neg_cap, neg_mask, neg_image):
+    similarity = model(to_variable(neg_cap), to_variable(neg_mask), to_variable(pos_image), False)
+    s_v_pos_u_neg = similarity.data.cpu().numpy()
+    random_indices = [get_k_random_numbers(len(pos_image), curr) for curr in range(len(pos_image))]
+    argmax_cap = to_tensor([each[np.argmax(s_v_pos_u_neg[each])] for each in random_indices]).long()
+    neg_cap = torch.index_select(neg_cap, 0, argmax_cap)
+    neg_mask = torch.index_select(neg_mask, 0, argmax_cap)
+    similarity = model(to_variable(pos_cap), to_variable(pos_mask), to_variable(neg_image), False)
+    s_u_pos_v_neg = similarity.data.cpu().numpy()
+    random_indices = [get_k_random_numbers(len(neg_image), curr) for curr in range(len(neg_image))]
+    argmax_img = to_tensor([each[np.argmax(s_u_pos_v_neg[each])] for each in random_indices]).long()
+    neg_image = torch.index_select(neg_image, 0, argmax_img)
+    return pos_cap, pos_mask, pos_image, neg_cap, neg_mask, neg_image
+        
 
 class CustomDataSet1(torch.utils.data.TensorDataset):
     def __init__(self, test_ids):
@@ -147,7 +172,7 @@ def train():
     if torch.cuda.is_available():
         model = model.cuda()
         loss_function = loss_function.cuda()
-    model.load_state_dict(torch.load('model_weights_ind_40_0.1942.t7'))
+    #model.load_state_dict(torch.load('model_weights_ind_33_0.1908.t7'))
     #optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, nesterov=True, weight_decay=0.0005)
     #optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=0.0001)
     optimizer = torch.optim.Adadelta(model.parameters(), lr=0.1, weight_decay=0.0001)
@@ -160,6 +185,7 @@ def train():
         start_time = timer()
         num_of_mini_batches = len(train_ids) // BATCH_SIZE
         for (caption, mask, image, neg_cap, neg_mask, neg_image) in train_data_loader:
+            caption, mask, image, neg_cap, neg_mask, neg_image = hard_negative_mining(model, caption, mask, image, neg_cap, neg_mask, neg_image)
             optimizer.zero_grad()
             # Run our forward pass.
             similarity = model(to_variable(caption), to_variable(mask), to_variable(image), False)

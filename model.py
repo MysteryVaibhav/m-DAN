@@ -74,14 +74,12 @@ class biLSTM(torch.nn.Module):
                 to_variable(torch.zeros(2, self.batch_size, self.hidden_dim)))
 
     def forward(self, sentence):
-        embeds = self.word_embeddings(sentence)
-        self.batch_size = embeds.size()[0]
+        embeds = self.word_embeddings(sentence.t())
+        self.batch_size = embeds.size()[1]
         # clear out the hidden state of the LSTM
         self.hidden = self.init_hidden()
 
-        outputs = to_variable(to_tensor(np.zeros((MAX_CAPTION_LEN, self.batch_size, self.hidden_dim * 2))))
-        for seq in range(MAX_CAPTION_LEN):
-            outputs[seq], self.hidden = self.lstm(embeds[:, seq, :].contiguous().view(1, self.batch_size, -1), self.hidden)
+        outputs, self.hidden = self.lstm(embeds, self.hidden)
 
         out_forward = outputs[:MAX_CAPTION_LEN, :self.batch_size, :self.hidden_dim]
         out_backward = outputs[:MAX_CAPTION_LEN, :self.batch_size, self.hidden_dim:]
