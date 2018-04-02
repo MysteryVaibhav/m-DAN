@@ -1,5 +1,5 @@
 # m-DAN: Dual Attention Networks for Multimodal Reasoning and Matching
-Implement current SOTA model for image text matching task. Link to the paper: https://arxiv.org/abs/1611.00471
+Implementation of current SoTA model for image text matching task. Link to the paper: https://arxiv.org/abs/1611.00471
 
 To train a model: 
 ```
