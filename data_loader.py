@@ -112,6 +112,7 @@ class DataLoader:
         self.plain_val_ids = get_ids('val', params.split_file, strip=True)
         self.test_ids = get_ids('test', params.split_file)
         self.plain_test_ids = get_ids('test', params.split_file, strip=True)
+        kwargs = {'num_workers': 4, 'pin_memory': True} if torch.cuda.is_available() else {}
         self.training_data_loader = torch.utils.data.DataLoader(CustomDataSet(self.img_one_hot,
                                                                               self.train_ids,
                                                                               params.regions_in_image,
@@ -121,7 +122,7 @@ class DataLoader:
                                                                               self.concept_vectors
                                                                               ),
                                                                 batch_size=self.params.mini_batch_size,
-                                                                shuffle=True)
+                                                                shuffle=True, **kwargs)
         self.eval_data_loader_1 = torch.utils.data.DataLoader(CustomDataSet1(self.plain_val_ids,
                                                                              params.regions_in_image,
                                                                              params.visual_feature_dimension,
@@ -131,14 +132,14 @@ class DataLoader:
                                                                              self.concept_vectors
                                                                              ),
                                                               batch_size=self.params.mini_batch_size,
-                                                              shuffle=False)
+                                                              shuffle=False, **kwargs)
         self.eval_data_loader_2 = torch.utils.data.DataLoader(CustomDataSet2(self.img_one_hot,
                                                                              self.val_ids,
                                                                              params.regions_in_image,
                                                                              params.visual_feature_dimension,
                                                                              params.number_of_concepts),
                                                               batch_size=self.params.mini_batch_size,
-                                                              shuffle=False)
+                                                              shuffle=False, **kwargs)
         self.test_data_loader_1 = torch.utils.data.DataLoader(CustomDataSet1(self.plain_test_ids,
                                                                              params.regions_in_image,
                                                                              params.visual_feature_dimension,
@@ -148,14 +149,14 @@ class DataLoader:
                                                                              self.concept_vectors
                                                                              ),
                                                               batch_size=self.params.mini_batch_size,
-                                                              shuffle=False)
+                                                              shuffle=False, **kwargs)
         self.test_data_loader_2 = torch.utils.data.DataLoader(CustomDataSet2(self.img_one_hot,
                                                                              self.test_ids,
                                                                              params.regions_in_image,
                                                                              params.visual_feature_dimension,
                                                                              params.number_of_concepts),
                                                               batch_size=self.params.mini_batch_size,
-                                                              shuffle=False)
+                                                              shuffle=False, **kwargs)
 
     @staticmethod
     def hard_negative_mining(model, pos_cap, pos_mask, pos_image, neg_cap, neg_mask, neg_image, concept, neg_concept):
