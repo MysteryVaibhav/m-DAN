@@ -59,7 +59,7 @@ class Trainer:
             num_of_mini_batches = len(self.data_loader.train_ids) // self.params.mini_batch_size
             for (caption, mask, image, neg_cap, neg_mask, neg_image, concept,
                  neg_concept) in self.data_loader.training_data_loader:
-                break
+                
                 # Sample according to hard negative mining
                 caption, mask, image, neg_cap, neg_mask, neg_image, concept, neg_concept = self.data_loader.hard_negative_mining(
                                                                                                             model,
