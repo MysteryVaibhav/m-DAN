@@ -36,6 +36,7 @@ def parse_arguments():
     parser.add_argument("--visual_feature_dimension", dest="visual_feature_dimension", type=int,
                         default=VISUAL_FEATURE_DIMENSION)
     parser.add_argument("--regions_in_image", dest="regions_in_image", type=int, default=NO_OF_REGIONS_IN_IMAGE)
+    parser.add_argument("--number_of_concepts", dest="number_of_concepts", type=int, default=NO_OF_CONCEPTS)
     return parser.parse_args()
 
 

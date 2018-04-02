@@ -24,13 +24,15 @@ class MarginLoss(nn.Module):
     """
     Class for the margin loss
     """
+
     def __init__(self, margin):
         super(MarginLoss, self).__init__()
         self.margin = margin
 
-    def forward(self, s_v, s_v_, s_u_):
-        loss = ((self.margin - s_v + s_v_).clamp(min=0) + (self.margin - s_v + s_u_).clamp(
-            min=0)).sum()
+    def forward(self, s_u_v_w, s_v_w_, s_u_w_, s_u_v_):
+        loss = ((self.margin - s_u_v_w + s_v_w_).clamp(min=0) +
+                (self.margin - s_u_v_w + s_u_w_).clamp(min=0) +
+                (self.margin - s_u_v_w + s_u_v_).clamp(min=0)).sum()
         return loss
 
 
@@ -55,24 +57,30 @@ class Trainer:
             losses = []
             start_time = timer()
             num_of_mini_batches = len(self.data_loader.train_ids) // self.params.mini_batch_size
-            for (caption, mask, image, neg_cap, neg_mask, neg_image) in self.data_loader.training_data_loader:
-
+            for (caption, mask, image, neg_cap, neg_mask, neg_image, concept,
+                 neg_concept) in self.data_loader.training_data_loader:
+                break
                 # Sample according to hard negative mining
-                caption, mask, image, neg_cap, neg_mask, neg_image = self.data_loader.hard_negative_mining(model,
-                                                                                                           caption,
-                                                                                                           mask, image,
-                                                                                                           neg_cap,
-                                                                                                           neg_mask,
-                                                                                                           neg_image)
+                caption, mask, image, neg_cap, neg_mask, neg_image, concept, neg_concept = self.data_loader.hard_negative_mining(
+                                                                                                            model,
+                                                                                                            caption,
+                                                                                                            mask,
+                                                                                                            image,
+                                                                                                            neg_cap,
+                                                                                                            neg_mask,
+                                                                                                            neg_image,
+                                                                                                            concept,
+                                                                                                            neg_concept)
                 optimizer.zero_grad()
 
                 # forward pass.
-                similarity = model(to_variable(caption), to_variable(mask), to_variable(image), False)
-                similarity_neg_1 = model(to_variable(neg_cap), to_variable(neg_mask), to_variable(image), False)
-                similarity_neg_2 = model(to_variable(caption), to_variable(mask), to_variable(neg_image), False)
+                similarity = model(to_variable(caption), to_variable(mask), to_variable(image), to_variable(concept), False)
+                similarity_neg_1 = model(to_variable(neg_cap), to_variable(neg_mask), to_variable(image), to_variable(neg_concept), False)
+                similarity_neg_2 = model(to_variable(caption), to_variable(mask), to_variable(neg_image), to_variable(neg_concept), False)
+                similarity_neg_3 = model(to_variable(neg_cap), to_variable(neg_mask), to_variable(neg_image), to_variable(concept), False)
 
                 # Compute the loss, gradients, and update the parameters by calling optimizer.step()
-                loss = loss_function(similarity, similarity_neg_1, similarity_neg_2)
+                loss = loss_function(similarity, similarity_neg_1, similarity_neg_2, similarity_neg_3)
                 loss.backward()
                 losses.append(loss.data.cpu().numpy())
                 optimizer.step()
@@ -94,4 +102,5 @@ class Trainer:
             if r_at_1 > prev_best:
                 print("Recall at 1 increased....saving weights !!")
                 prev_best = r_at_1
-                torch.save(model.state_dict(), self.params.model_dir + 'model_weights_{}_{:.2f}.t7'.format(epoch + 1, r_at_1))
+                torch.save(model.state_dict(),
+                           self.params.model_dir + 'model_weights_{}_{:.2f}.t7'.format(epoch + 1, r_at_1))
