@@ -1,3 +1,4 @@
+import json
 import torch
 import numpy as np
 from properties import *
@@ -23,13 +24,13 @@ def normalize(v):
 
 
 # Returns a dictionary of image_id -> Caption (All 5 concatenated)
-def get_captions():
+def get_captions(caption_file):
     img_to_caption = {}
     id_img = {}
     max_len = 0
     cached_stop_words = stopwords.words("english")
     lemmatizer = WordNetLemmatizer()
-    with open(CAPTION_INFO, 'r', encoding='utf-8') as caption_data:
+    with open(caption_file, 'r', encoding='utf-8') as caption_data:
         i = 0
         for lines in caption_data.readlines():
             split_line = lines.split("\t")
@@ -110,8 +111,8 @@ def img_caption_one_hot(img_caption, word_idx, max_len):
     return img_to_one_hot
 
 
-def run():
-    img_caption, max_len, _ = get_captions()
+def run(caption_file):
+    img_caption, max_len, _ = get_captions(caption_file)
     print("Max len: {}".format(max_len))
     word_freq = frequency_map(img_caption)
     word_idx = construct_vocab(word_freq, 5)
@@ -120,9 +121,9 @@ def run():
     return img_one_hot_and_mask
 
 
-def get_ids(name, strip=False):
+def get_ids(name, split_file, strip=False):
     list = []
-    with open(SPLIT_INFO + "{}.lst".format(name), 'r', encoding='utf=8') as f:
+    with open(split_file + "{}.lst".format(name), 'r', encoding='utf=8') as f:
         for id in f.readlines():
             base = id.split("/")[1].replace("\n", "").replace(".jpg", "")
             if strip:
@@ -136,6 +137,44 @@ def get_ids(name, strip=False):
     return list
 
 
+def extract_concept_vectors(concepts_dir, number_of_concepts):
+    if os.path.exists('concept_vectors.npy'):
+        return np.load('concept_vectors.npy').item()
+
+    scores_dict = {}
+    for filename in os.listdir(concepts_dir):
+        score = np.zeros(number_of_concepts)   # Len of sin346
+        i = 0
+        img = filename.replace(".json", "")
+        with open(concepts_dir + filename) as json_data:
+            d = json.load(json_data)
+            # for elem in d['sports487']:
+            #     score[i] = float(elem['score'])
+            #     i += 1
+            # for elem in d['kinetics']:
+            #     score[i] = float(elem['score'])
+            #     i += 1
+            for elem in d['sin346']:
+                score[i] = float(elem['score'])
+                i += 1
+            # for elem in d['places365']:
+            #     score[i] = float(elem['score'])
+            #     i += 1
+            # for elem in d['fcvid']:
+            #     score[i] = float(elem['score'])
+            #     i += 1
+            # for elem in d['ucf101']:
+            #     score[i] = float(elem['score'])
+            #     i += 1
+            # for elem in d['yfcc609']:
+            #     score[i] = float(elem['score'])
+            #     i += 1
+            scores_dict[img] = score
+    np.save('concept_vectors.npy', scores_dict)
+    return scores_dict
+
+
 if __name__ == '__main__':
-    run()
+    run(CAPTION_INFO)
+    extract_concept_vectors(CONCEPT_DIR)
 

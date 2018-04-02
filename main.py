@@ -13,6 +13,7 @@ def parse_arguments():
     parser.add_argument("--image_features_dir", dest="image_features_dir", type=str, default=IMAGES_DIR)
     parser.add_argument("--caption_file", dest="caption_file", type=str, default=CAPTION_INFO)
     parser.add_argument("--split_file", dest="split_file", type=str, default=SPLIT_INFO)
+    parser.add_argument("--concepts_dir", dest="concepts_dir", type=str, default=CONCEPT_DIR)
 
     parser.add_argument("--hidden_dimension", dest="hidden_dimension", type=int, default=HIDDEN_DIMENSION)
     parser.add_argument("--embedding_dimension", dest="embedding_dimension", type=int, default=EMBEDDING_DIMENSION)
