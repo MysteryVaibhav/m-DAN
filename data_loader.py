@@ -176,5 +176,5 @@ class DataLoader:
         s_w_pos_u_neg_v_neg = similarity.data.cpu().numpy()
         random_indices = [get_k_random_numbers(len(neg_concept), curr) for curr in range(len(neg_concept))]
         argmax_concept = to_tensor([each[np.argmax(s_w_pos_u_neg_v_neg[each])] for each in random_indices]).long()
-        neg_concept = torch.index_select(neg_image, 0, argmax_concept)
+        neg_concept = torch.index_select(neg_concept, 0, argmax_concept)
         return pos_cap, pos_mask, pos_image, neg_cap, neg_mask, neg_image, concept, neg_concept
