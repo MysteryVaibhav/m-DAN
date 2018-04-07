@@ -8,8 +8,9 @@ from properties import *
 from util import *
 import sys
 from process_data import run, get_ids
-from tqdm import tqdm
 
+
+kwargs = {'num_workers': 4, 'pin_memory': True} if torch.cuda.is_available() else {}
 
 class CustomDataSet(torch.utils.data.TensorDataset):
     def __init__(self, img_one_hot, ids, is_train):
@@ -102,7 +103,7 @@ class CustomDataSet2(torch.utils.data.TensorDataset):
 def recall(model, img_one_hot):
     test_z_v = None  # no_of_images * visual_context_features
     plain_val_ids = get_ids('val', strip=True)
-    data_loader = torch.utils.data.DataLoader(CustomDataSet1(plain_val_ids), batch_size=BATCH_SIZE, shuffle=False)
+    data_loader = torch.utils.data.DataLoader(CustomDataSet1(plain_val_ids), batch_size=BATCH_SIZE, shuffle=False, **kwargs)
     for (caption_, mask_, image_) in data_loader:
         _, _, z_v = model(to_variable(caption_),
                           to_variable(mask_),
@@ -114,7 +115,7 @@ def recall(model, img_one_hot):
     test_z_v = test_z_v.numpy()
 
     val_ids = get_ids('val')
-    data_loader = torch.utils.data.DataLoader(CustomDataSet2(img_one_hot, val_ids), batch_size=BATCH_SIZE, shuffle=False)
+    data_loader = torch.utils.data.DataLoader(CustomDataSet2(img_one_hot, val_ids), batch_size=BATCH_SIZE, shuffle=False, **kwargs)
     r_1 = 0
     r_5 = 0
     r_10 = 0
@@ -165,7 +166,7 @@ def train():
     img_one_hot = run()
     train_ids = get_ids('train')
     train_data_loader = torch.utils.data.DataLoader(CustomDataSet(img_one_hot, train_ids, True), batch_size=BATCH_SIZE,
-                                                    shuffle=True)
+                                                    shuffle=True, **kwargs)
     model = mDAN()
     model.apply(init_xavier)
     loss_function = margin_loss()

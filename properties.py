@@ -11,15 +11,16 @@ MAX_CAPTION_LEN = 82 #49
 
 # DATA RELATED
 VISUAL_FEATURE_DIMENSION = 2048
-NO_OF_REGIONS_IN_IMAGE = 1 #14 * 14
+NO_OF_REGIONS_IN_IMAGE = 14 * 14
 
 # MODEL 
 NO_OF_STEPS = 2
 MARGIN = 100
 
 # PATH
-#TRAIN_IMAGES_DIR = '/data/disk1/junweil/vision_language/data/flickr30k/resnet-101/'
-TRAIN_IMAGES_DIR = '/data/disk1/junweil/vision_language/data/flickr30k/resnet-101_avg/'
-CAPTION_INFO = '/data/disk1/junweil/vision_language/data/flickr30k/results_20130124.token'
-SPLIT_INFO = '/data/disk1/junweil/vision_language/data/flickr30k/splits/'
+TRAIN_IMAGES_DIR = '/mnt/ssd1/junweil/vision_language/resnet-152/'
+#TRAIN_IMAGES_DIR = '/data/disk1/junweil/vision_language/data/flickr30k/resnet-101_avg/'
+CAPTION_INFO = 'results_20130124.token'
+SPLIT_INFO = '/mnt/ssd1/junweil/vision_language/splits/'
 IMAGES_DIR = '/data/disk1/junweil/vision_language/data/flickr30k/flickr30k_images/'
+CONCEPT_DIR = '/mnt/ssd1/junweil/vision_language/semantic_feat/'
