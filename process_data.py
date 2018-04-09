@@ -1,4 +1,6 @@
 import numpy as np
+import os
+import json
 from properties import *
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
@@ -123,6 +125,43 @@ def get_ids(name, strip=False):
                 list.append(base + "#3")
                 list.append(base + "#4")
     return list
+
+
+def extract_concept_vectors(concepts_dir, number_of_concepts):
+    if os.path.exists('concept_vectors.npy'):
+        return np.load('concept_vectors.npy').item()
+
+    scores_dict = {}
+    for filename in os.listdir(concepts_dir):
+        score = np.zeros(number_of_concepts)   # Len of sin346
+        i = 0
+        img = filename.replace(".json", "")
+        with open(concepts_dir + filename) as json_data:
+            d = json.load(json_data)
+            # for elem in d['sports487']:
+            #     score[i] = float(elem['score'])
+            #     i += 1
+            # for elem in d['kinetics']:
+            #     score[i] = float(elem['score'])
+            #     i += 1
+            # for elem in d['sin346']:
+            #     score[i] = float(elem['score'])
+            #     i += 1
+            for elem in d['places365']:
+                score[i] = float(elem['score'])
+                i += 1
+            # for elem in d['fcvid']:
+            #     score[i] = float(elem['score'])
+            #     i += 1
+            # for elem in d['ucf101']:
+            #     score[i] = float(elem['score'])
+            #     i += 1
+            # for elem in d['yfcc609']:
+            #     score[i] = float(elem['score'])
+            #     i += 1
+            scores_dict[img] = score
+    np.save('concept_vectors.npy', scores_dict)
+    return scores_dict
 
 
 if __name__ == '__main__':

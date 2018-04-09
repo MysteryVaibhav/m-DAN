@@ -19,8 +19,10 @@ class mDAN(torch.nn.Module):
         self.t_attn = t_attn
         v_attn = V_Att()
         self.v_attn = v_attn
+        w_attn = W_Att()
+        self.w_attn = w_attn
 
-    def forward(self, input_caption, mask, input_image, is_inference):
+    def forward(self, input_caption, mask, input_image, concept, is_inference):
         h = self.text_encoder(input_caption)
         i = input_image
 
@@ -33,27 +35,37 @@ class mDAN(torch.nn.Module):
         self.v_0 = self.v_attn.activation(self.v_attn.linear_transform(avg_v))
         self.v_attn.m_v = self.v_0      # Since m_0 = v_0
 
+        # Concept Attention
+        concept = concept.unsqueeze(2)  # batch_size * no_of_concepts * 1
+        avg_w = to_variable((concept.sum(1) * (1 / NO_OF_CONCEPT)).data, requires_grad=True)
+        self.w_0 = self.w_attn.activation(self.w_attn.linear_transform(avg_w))
+        self.w_attn.m_w = self.w_0  # Since m_0 = w_0
+
         # Creating similarity vectors for inference
         if is_inference:
             z_u = to_variable(self.u_0.data, requires_grad=False)
             z_v = to_variable(self.v_0.data, requires_grad=False)
+            z_w = to_variable(self.w_0.data, requires_grad=False)
 
         # Similarity, will be used to compute loss and do backprop
-        S = torch.sum(self.u_0 * self.v_0, 1)
+        S = torch.sum(self.u_0 * self.v_0 * self.w_0, 1)
 
         # Repeating the above process for NO_OF_STEPS
         for steps in range(NO_OF_STEPS):
             if steps > 0:
                 self.t_attn.m_u = self.t_attn.m_u + u_1
                 self.v_attn.m_v = self.v_attn.m_v + v_1
+                self.w_attn.m_w = self.w_attn.m_w + w_1
             u_1 = self.t_attn(h, mask)
             v_1 = self.v_attn(i)
+            w_1 = self.w_attn(concept)
             if is_inference:
                 z_u = z_u.cat((z_u, u_1), 1)
                 z_v = z_v.cat((z_v, v_1), 1)
-            S = S + torch.sum(u_1 * v_1, 1)
+                z_w = z_w.cat((z_w, w_1), 1)
+            S = S + torch.sum(u_1 * v_1 * w_1, 1)
         if is_inference:
-            return S, z_u, z_v
+            return S, z_u, z_v, z_w
         return S
 
 
@@ -119,4 +131,21 @@ class V_Att(torch.nn.Module):
         alpha_v = self.linear(h_v)  # BATCH_SIZE * NO_OF_REGIONS_IN_IMAGE * 1
         alpha_v = F.softmax(alpha_v, dim=1)
         return self.activation(self.linear_transform((alpha_v * v).sum(1)))    # Context vector: BATCH_SIZE * EMBEDDING_DIMENSION
+
+
+class W_Att(torch.nn.Module):
+    def __init__(self):
+        super(W_Att, self).__init__()
+        self.layer1 = nn.Linear(in_features=1, out_features=HIDDEN_DIMENSION)
+        self.activation = nn.Tanh()
+        self.layer2 = nn.Linear(in_features=EMBEDDING_DIMENSION, out_features=HIDDEN_DIMENSION)
+        self.linear = nn.Linear(in_features=EMBEDDING_DIMENSION, out_features=1)
+        self.linear_transform = nn.Linear(in_features=1, out_features=EMBEDDING_DIMENSION)
+
+    def forward(self, w):
+        h_w = self.activation(self.layer1(w)) * torch.unsqueeze(self.activation(self.layer2(self.m_w)), 1)
+        alpha_w = self.linear(h_w)  # BATCH_SIZE * NO_OF_CONCEPTS * 1
+        alpha_w = F.softmax(alpha_w, dim=1)
+        return self.activation(
+            self.linear_transform((alpha_w * w).sum(1)))            # Context vector: BATCH_SIZE * EMBEDDING_DIMENSION
 
