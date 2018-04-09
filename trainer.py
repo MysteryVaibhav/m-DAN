@@ -195,6 +195,7 @@ def train():
             # Compute the loss, gradients, and update the parameters by calling optimizer.step()
             loss = loss_function(similarity, similarity_neg_1, similarity_neg_2)
             loss.backward()
+            #torch.nn.utils.clip_grad_norm(model.parameters(), CLIP_VALUE)
             losses.append(loss.data.cpu().numpy())
             optimizer.step()
             sys.stdout.write("[%d/%d] :: Training Loss: %f   \r" % (

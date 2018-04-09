@@ -21,12 +21,8 @@ class mDAN(torch.nn.Module):
         self.v_attn = v_attn
 
     def forward(self, input_caption, mask, input_image, is_inference):
-        h = self.text_encoder(input_caption, mask)
+        h = self.text_encoder(input_caption)
         i = input_image
-
-        # Modify mask, according to max-seq-len in the batch
-        max_seq_len_in_batch = h.size(1)
-        mask = mask[:, :max_seq_len_in_batch]
 
         # Textual Attention
         self.u_0 = (h * mask.unsqueeze(2)).sum(1)/torch.unsqueeze(torch.clamp(torch.sum(mask, dim=1), min=1), 1)     # Take care of masking here
@@ -78,26 +74,18 @@ class biLSTM(torch.nn.Module):
         return (to_variable(torch.zeros(2, self.batch_size, self.hidden_dim)),
                 to_variable(torch.zeros(2, self.batch_size, self.hidden_dim)))
 
-    def forward(self, seq, mask):
-        # Sorting sequences by their lengths for packing
-        seq_lens = mask.sum(dim=1).long()
-        seq_lens, perm_idx = seq_lens.sort(0, descending=True)
-        seq = seq[perm_idx]
-        seq = seq.transpose(0, 1)       # seq_len * batch_size * embedding_dimension
-
-        embeds = self.word_embeddings(seq)
+    def forward(self, sentence):
+        embeds = self.word_embeddings(sentence.t())
         self.batch_size = embeds.size()[1]
         # clear out the hidden state of the LSTM
         self.hidden = self.init_hidden()
 
-        packed_input = pack_padded_sequence(embeds, seq_lens.data.cpu().numpy())
-        packed_outputs, self.hidden = self.lstm(packed_input, self.hidden)
-        outputs, _ = pad_packed_sequence(packed_outputs)
+        outputs, self.hidden = self.lstm(embeds, self.hidden)
 
         out_forward = outputs[:MAX_CAPTION_LEN, :self.batch_size, :self.hidden_dim]
         out_backward = outputs[:MAX_CAPTION_LEN, :self.batch_size, self.hidden_dim:]
-        # Adding the forward and backward embedding as per the paper, and unsorting sequences for modules ahead
-        return (out_forward + out_backward).permute(1, 0, 2)[perm_idx]  # BATCH_SIZE * MAX_LEN * HIDDEN_DIMENSION
+        # Adding the forward and backward embedding as per the paper
+        return (out_forward + out_backward).permute(1, 0, 2)  # BATCH_SIZE * MAX_LEN * HIDDEN_DIMENSION
 
 
 class T_Att(torch.nn.Module):
