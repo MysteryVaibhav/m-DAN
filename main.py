@@ -9,8 +9,8 @@ from trainer import Trainer
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description='Argument Parser for m-DAN')
-    parser.add_argument("--image_dir", dest="image_dir", type=str, default=TRAIN_IMAGES_DIR)
-    parser.add_argument("--image_features_dir", dest="image_features_dir", type=str, default=IMAGES_DIR)
+    parser.add_argument("--image_dir", dest="image_dir", type=str, default=IMAGES_DIR)
+    parser.add_argument("--image_features_dir", dest="image_features_dir", type=str, default=TRAIN_IMAGES_DIR)
     parser.add_argument("--caption_file", dest="caption_file", type=str, default=CAPTION_INFO)
     parser.add_argument("--split_file", dest="split_file", type=str, default=SPLIT_INFO)
 

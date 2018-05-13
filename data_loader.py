@@ -38,15 +38,6 @@ class CustomDataSet(torch.utils.data.TensorDataset):
                to_tensor(input_neg).long(), to_tensor(mask_neg), to_tensor(image_neg)
 
 
-def get_k_random_numbers(n, curr, k=32):
-    random_indices = set()
-    while len(random_indices) < k:
-        idx = np.random.randint(n)
-        if idx != curr and idx not in random_indices:
-            random_indices.add(idx)
-    return list(random_indices)
-
-
 class CustomDataSet1(torch.utils.data.TensorDataset):
     def __init__(self, test_ids, regions_in_image, visual_feature_dimension, image_features_dir, max_caption_len):
         self.ids = test_ids
@@ -135,15 +126,11 @@ class DataLoader:
 
     @staticmethod
     def hard_negative_mining(model, pos_cap, pos_mask, pos_image, neg_cap, neg_mask, neg_image):
-        similarity = model(to_variable(neg_cap), to_variable(neg_mask), to_variable(pos_image), False)
-        s_v_pos_u_neg = similarity.data.cpu().numpy()
-        random_indices = [get_k_random_numbers(len(pos_image), curr) for curr in range(len(pos_image))]
-        argmax_cap = to_tensor([each[np.argmax(s_v_pos_u_neg[each])] for each in random_indices]).long()
+        _, z_u, z_v = model(to_variable(neg_cap), to_variable(neg_mask), to_variable(pos_image), True)
+        argmax_cap = torch.matmul(z_v.data, z_u.data.transpose(0, 1)).max(dim=1)[1]
         neg_cap = torch.index_select(neg_cap, 0, argmax_cap)
         neg_mask = torch.index_select(neg_mask, 0, argmax_cap)
-        similarity = model(to_variable(pos_cap), to_variable(pos_mask), to_variable(neg_image), False)
-        s_u_pos_v_neg = similarity.data.cpu().numpy()
-        random_indices = [get_k_random_numbers(len(neg_image), curr) for curr in range(len(neg_image))]
-        argmax_img = to_tensor([each[np.argmax(s_u_pos_v_neg[each])] for each in random_indices]).long()
+        _, z_u, z_v = model(to_variable(pos_cap), to_variable(pos_mask), to_variable(neg_image), True)
+        argmax_img = torch.matmul(z_u.data, z_v.data.transpose(0, 1)).max(dim=1)[1]
         neg_image = torch.index_select(neg_image, 0, argmax_img)
         return pos_cap, pos_mask, pos_image, neg_cap, neg_mask, neg_image

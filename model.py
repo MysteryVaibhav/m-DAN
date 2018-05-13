@@ -39,20 +39,20 @@ class mDAN(torch.nn.Module):
 
         # Textual Attention
         self.t_attn.u_0 = (h * mask.unsqueeze(2)).sum(1) / torch.unsqueeze(torch.sum(mask, dim=1), dim=1)
-        self.t_attn.m_u = self.u_0  # Since m_0 = u_0
+        self.t_attn.m_u = self.t_attn.u_0  # Since m_0 = u_0
 
         # Visual Attention
         avg_v = to_variable((i.sum(1) * (1 / self.regions_in_image)).data, requires_grad=True)
         self.v_attn.v_0 = self.v_attn.activation(self.v_attn.P[0](avg_v))
-        self.v_attn.m_v = self.v_0  # Since m_0 = v_0
+        self.v_attn.m_v = self.v_attn.v_0  # Since m_0 = v_0
 
         # Creating similarity vectors for inference
         if is_inference:
-            z_u = to_variable(self.u_0.data, requires_grad=False)
-            z_v = to_variable(self.v_0.data, requires_grad=False)
+            z_u = to_variable(self.t_attn.u_0.data, requires_grad=False)
+            z_v = to_variable(self.v_attn.v_0.data, requires_grad=False)
 
         # Similarity, will be used to compute loss and do backprop
-        S = torch.sum(self.u_0 * self.v_0, 1)
+        S = torch.sum(self.t_attn.u_0 * self.v_attn.v_0, 1)
 
         # Repeating the above process for NO_OF_STEPS
         for k in range(self.number_of_steps):
