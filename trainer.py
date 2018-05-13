@@ -56,7 +56,15 @@ class Trainer:
             start_time = timer()
             num_of_mini_batches = len(self.data_loader.train_ids) // self.params.mini_batch_size
             for (caption, mask, image, neg_cap, neg_mask, neg_image) in self.data_loader.training_data_loader:
-
+                
+                if torch.cuda.is_available():
+                    caption = caption.cuda()
+                    mask = mask.cuda()
+                    image = image.cuda()
+                    neg_cap = neg_cap.cuda()
+                    neg_mask = neg_mask.cuda()
+                    neg_image = neg_image.cuda()
+                
                 # Sample according to hard negative mining
                 caption, mask, image, neg_cap, neg_mask, neg_image = self.data_loader.hard_negative_mining(model,
                                                                                                            caption,
@@ -67,9 +75,9 @@ class Trainer:
                 optimizer.zero_grad()
 
                 # forward pass.
-                similarity = model(to_variable(caption), to_variable(mask), to_variable(image), False)
-                similarity_neg_1 = model(to_variable(neg_cap), to_variable(neg_mask), to_variable(image), False)
-                similarity_neg_2 = model(to_variable(caption), to_variable(mask), to_variable(neg_image), False)
+                similarity = model(torch.autograd.Variable(caption), torch.autograd.Variable(mask), torch.autograd.Variable(image), False)
+                similarity_neg_1 = model(torch.autograd.Variable(neg_cap), torch.autograd.Variable(neg_mask), torch.autograd.Variable(image), False)
+                similarity_neg_2 = model(torch.autograd.Variable(caption), torch.autograd.Variable(mask), torch.autograd.Variable(neg_image), False)
 
                 # Compute the loss, gradients, and update the parameters by calling optimizer.step()
                 loss = loss_function(similarity, similarity_neg_1, similarity_neg_2)

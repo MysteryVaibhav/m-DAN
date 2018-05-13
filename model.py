@@ -42,14 +42,14 @@ class mDAN(torch.nn.Module):
         self.t_attn.m_u = self.t_attn.u_0  # Since m_0 = u_0
 
         # Visual Attention
-        avg_v = to_variable((i.sum(1) * (1 / self.regions_in_image)).data, requires_grad=True)
+        avg_v = torch.autograd.Variable((i.sum(1) * (1 / self.regions_in_image)).data, requires_grad=True)
         self.v_attn.v_0 = self.v_attn.activation(self.v_attn.P[0](avg_v))
         self.v_attn.m_v = self.v_attn.v_0  # Since m_0 = v_0
 
         # Creating similarity vectors for inference
         if is_inference:
-            z_u = to_variable(self.t_attn.u_0.data, requires_grad=False)
-            z_v = to_variable(self.v_attn.v_0.data, requires_grad=False)
+            z_u = torch.autograd.Variable(self.t_attn.u_0.data, requires_grad=False)
+            z_v = torch.autograd.Variable(self.v_attn.v_0.data, requires_grad=False)
 
         # Similarity, will be used to compute loss and do backprop
         S = torch.sum(self.t_attn.u_0 * self.v_attn.v_0, 1)

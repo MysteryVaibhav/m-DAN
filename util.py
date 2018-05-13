@@ -7,12 +7,12 @@ from nltk.stem import WordNetLemmatizer
 
 def to_tensor(array):
     tensor = torch.from_numpy(np.array(array)).float()
-    if torch.cuda.is_available():
-        tensor = tensor.cuda()
     return tensor
 
 
 def to_variable(tensor, requires_grad=False):
+    if torch.cuda.is_available():
+        tensor = tensor.cuda()
     return torch.autograd.Variable(tensor, requires_grad=requires_grad)
 
 
