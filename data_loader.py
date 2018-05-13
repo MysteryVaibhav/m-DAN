@@ -38,7 +38,7 @@ class CustomDataSet(torch.utils.data.TensorDataset):
                to_tensor(input_neg).long(), to_tensor(mask_neg), to_tensor(image_neg)
 
 
-def get_k_random_numbers(n, curr, k=16):
+def get_k_random_numbers(n, curr, k=32):
     random_indices = set()
     while len(random_indices) < k:
         idx = np.random.randint(n)

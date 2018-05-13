@@ -74,6 +74,11 @@ class Trainer:
                 # Compute the loss, gradients, and update the parameters by calling optimizer.step()
                 loss = loss_function(similarity, similarity_neg_1, similarity_neg_2)
                 loss.backward()
+
+                # Clip gradients
+                if self.params.clip_value > 0:
+                    torch.nn.utils.clip_grad_norm(model.parameters(), self.params.clip_value)
+
                 losses.append(loss.data.cpu().numpy())
                 optimizer.step()
 
