@@ -86,8 +86,8 @@ class DataLoader:
         self.plain_val_ids = get_ids('val', strip=True)
         self.test_ids = get_ids('test')
         self.plain_test_ids = get_ids('test', strip=True)
-        #kwargs = {'num_workers': 8, 'pin_memory': True} if torch.cuda.is_available() else {}
-        kwargs = {} if torch.cuda.is_available() else {}
+        kwargs = {'num_workers': 4, 'pin_memory': True} if torch.cuda.is_available() else {}
+        #kwargs = {} if torch.cuda.is_available() else {}
         self.training_data_loader = torch.utils.data.DataLoader(CustomDataSet(self.img_one_hot,
                                                                               self.train_ids,
                                                                               params.regions_in_image,

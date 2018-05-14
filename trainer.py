@@ -4,6 +4,7 @@ from model import mDAN
 from timeit import default_timer as timer
 from util import *
 import sys
+from tqdm import tqdm
 
 
 def init_xavier(m):
@@ -47,15 +48,17 @@ class Trainer:
         if torch.cuda.is_available():
             model = model.cuda()
             loss_function = loss_function.cuda()
-        optimizer = torch.optim.Adadelta(model.parameters(), lr=self.params.learning_rate,
-                                         weight_decay=self.params.wdecay)
+        #optimizer = torch.optim.Adadelta(model.parameters(), lr=self.params.learning_rate, weight_decay=self.params.wdecay)
+        optimizer = torch.optim.SGD(model.parameters(), lr=self.params.learning_rate, momentum=0.9, weight_decay=self.params.wdecay)
         prev_best = 0
+        r_at_1, r_at_5, r_at_10 = self.evaluator.recall(model, is_test=False)
+        print("Initial recall: R@1 : {}, R@5 : {}, R@10 : {}".format(r_at_1, r_at_5, r_at_10))
         for epoch in range(self.params.num_epochs):
             iters = 1
             losses = []
             start_time = timer()
             num_of_mini_batches = len(self.data_loader.train_ids) // self.params.mini_batch_size
-            for (caption, mask, image, neg_cap, neg_mask, neg_image) in self.data_loader.training_data_loader:
+            for (caption, mask, image, neg_cap, neg_mask, neg_image) in tqdm(self.data_loader.training_data_loader):
                 
                 if torch.cuda.is_available():
                     caption = caption.cuda()
@@ -94,9 +97,9 @@ class Trainer:
                 if iters % self.params.step_size == 0:
                     optimizer.param_groups[0]['lr'] /= self.params.gamma
 
-                sys.stdout.write("[%d/%d] :: Training Loss: %f   \r" % (
-                    iters, num_of_mini_batches, np.asscalar(np.mean(losses))))
-                sys.stdout.flush()
+                #sys.stdout.write("[%d/%d] :: Training Loss: %f   \r" % (
+                #    iters, num_of_mini_batches, np.asscalar(np.mean(losses))))
+                #sys.stdout.flush()
                 iters += 1
 
             # Calculate r@k after each epoch
