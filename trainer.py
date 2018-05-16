@@ -54,16 +54,12 @@ def get_k_random_numbers(n, curr, k=16):
 
 
 def hard_negative_mining(model, pos_cap, pos_mask, pos_image, neg_cap, neg_mask, neg_image):
-    similarity = model(to_variable(neg_cap), to_variable(neg_mask), to_variable(pos_image), False)
-    s_v_pos_u_neg = similarity.data.cpu().numpy()
-    random_indices = [get_k_random_numbers(len(pos_image), curr) for curr in range(len(pos_image))]
-    argmax_cap = to_tensor([each[np.argmax(s_v_pos_u_neg[each])] for each in random_indices]).long()
+    _, z_u, z_v = model(torch.autograd.Variable(neg_cap), torch.autograd.Variable(neg_mask), torch.autograd.Variable(pos_image), True)
+    argmax_cap = torch.matmul(z_v.data, z_u.data.transpose(0, 1)).max(dim=1)[1]
     neg_cap = torch.index_select(neg_cap, 0, argmax_cap)
     neg_mask = torch.index_select(neg_mask, 0, argmax_cap)
-    similarity = model(to_variable(pos_cap), to_variable(pos_mask), to_variable(neg_image), False)
-    s_u_pos_v_neg = similarity.data.cpu().numpy()
-    random_indices = [get_k_random_numbers(len(neg_image), curr) for curr in range(len(neg_image))]
-    argmax_img = to_tensor([each[np.argmax(s_u_pos_v_neg[each])] for each in random_indices]).long()
+    _, z_u, z_v = model(torch.autograd.Variable(pos_cap), torch.autograd.Variable(pos_mask), torch.autograd.Variable(neg_image), True)
+    argmax_img = torch.matmul(z_u.data, z_v.data.transpose(0, 1)).max(dim=1)[1]
     neg_image = torch.index_select(neg_image, 0, argmax_img)
     return pos_cap, pos_mask, pos_image, neg_cap, neg_mask, neg_image
         
@@ -185,12 +181,22 @@ def train():
         start_time = timer()
         num_of_mini_batches = len(train_ids) // BATCH_SIZE
         for (caption, mask, image, neg_cap, neg_mask, neg_image) in train_data_loader:
-            caption, mask, image, neg_cap, neg_mask, neg_image = hard_negative_mining(model, caption, mask, image, neg_cap, neg_mask, neg_image)
+            
+            if torch.cuda.is_available():
+                caption = caption.cuda()
+                mask = mask.cuda()
+                image = image.cuda()
+                neg_cap = neg_cap.cuda()
+                neg_mask = neg_mask.cuda()
+                neg_image = neg_image.cuda()
+            
+            #caption, mask, image, neg_cap, neg_mask, neg_image = hard_negative_mining(model, caption, mask, image, neg_cap, neg_mask, neg_image)
             optimizer.zero_grad()
             # Run our forward pass.
-            similarity = model(to_variable(caption), to_variable(mask), to_variable(image), False)
-            similarity_neg_1 = model(to_variable(neg_cap), to_variable(neg_mask), to_variable(image), False)
-            similarity_neg_2 = model(to_variable(caption), to_variable(mask), to_variable(neg_image), False)
+            similarity = model(torch.autograd.Variable(caption), torch.autograd.Variable(mask), torch.autograd.Variable(image), False)
+            similarity_neg_1 = model(torch.autograd.Variable(neg_cap), torch.autograd.Variable(neg_mask), torch.autograd.Variable(image), False)
+            similarity_neg_2 = model(torch.autograd.Variable(caption), torch.autograd.Variable(mask), torch.autograd.Variable(neg_image), False)
+
             # Compute the loss, gradients, and update the parameters by calling optimizer.step()
             loss = loss_function(similarity, similarity_neg_1, similarity_neg_2)
             loss.backward()

@@ -65,13 +65,13 @@ class biLSTM(torch.nn.Module):
         # Assigning pre-trained embeddings as initial weights
         #self.word_embeddings.weight.data.copy_(to_tensor(embeddings))
         nn.init.xavier_uniform(self.word_embeddings.weight)
-        self.lstm = nn.LSTM(EMBEDDING_DIMENSION, HIDDEN_DIMENSION, bidirectional=True)
+        self.lstm = nn.LSTM(EMBEDDING_DIMENSION, HIDDEN_DIMENSION, bidirectional=False)
 
     def init_hidden(self):
         # Assigning initial hidden and cell state
         # 2, since single layered LSTM
-        return (to_variable(torch.zeros(2, self.batch_size, self.hidden_dim)),
-                to_variable(torch.zeros(2, self.batch_size, self.hidden_dim)))
+        return (to_variable(torch.zeros(1, self.batch_size, self.hidden_dim)),
+                to_variable(torch.zeros(1, self.batch_size, self.hidden_dim)))
 
     def forward(self, sentence):
         embeds = self.word_embeddings(sentence.t())
@@ -81,10 +81,10 @@ class biLSTM(torch.nn.Module):
 
         outputs, self.hidden = self.lstm(embeds, self.hidden)
 
-        out_forward = outputs[:MAX_CAPTION_LEN, :self.batch_size, :self.hidden_dim]
-        out_backward = outputs[:MAX_CAPTION_LEN, :self.batch_size, self.hidden_dim:]
+        #out_forward = outputs[:MAX_CAPTION_LEN, :self.batch_size, :self.hidden_dim]
+        #out_backward = outputs[:MAX_CAPTION_LEN, :self.batch_size, self.hidden_dim:]
         # Adding the forward and backward embedding as per the paper
-        return (out_forward + out_backward).permute(1, 0, 2)  # BATCH_SIZE * MAX_LEN * HIDDEN_DIMENSION
+        return outputs.permute(1, 0, 2)  # BATCH_SIZE * MAX_LEN * HIDDEN_DIMENSION
 
 
 class T_Att(torch.nn.Module):
