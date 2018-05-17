@@ -29,7 +29,7 @@ class mDAN(torch.nn.Module):
 
         # Visual Attention
         avg_v = to_variable((i.sum(1)*(1/NO_OF_REGIONS_IN_IMAGE)).data, requires_grad=True)
-        self.v_0 = self.v_attn.activation(self.v_attn.linear_transform(avg_v))
+        self.v_0 = self.v_attn.activation(self.v_attn.P[0](avg_v))
         self.v_attn.m_v = self.v_0      # Since m_0 = v_0
 
         # Creating similarity vectors for inference
@@ -45,8 +45,8 @@ class mDAN(torch.nn.Module):
             if steps > 0:
                 self.t_attn.m_u = self.t_attn.m_u + u_1
                 self.v_attn.m_v = self.v_attn.m_v + v_1
-            u_1 = self.t_attn(h, mask)
-            v_1 = self.v_attn(i)
+            u_1 = self.t_attn(h, mask, steps)
+            v_1 = self.v_attn(i, steps)
             if is_inference:
                 z_u = z_u.cat((z_u, u_1), 1)
                 z_v = z_v.cat((z_v, v_1), 1)
@@ -90,32 +90,40 @@ class biLSTM(torch.nn.Module):
 class T_Att(torch.nn.Module):
     def __init__(self):
         super(T_Att, self).__init__()
-        self.layer1 = nn.Linear(in_features=EMBEDDING_DIMENSION, out_features=HIDDEN_DIMENSION)
         self.activation = nn.Tanh()
-        self.layer2 = nn.Linear(in_features=EMBEDDING_DIMENSION, out_features=HIDDEN_DIMENSION)
-        self.linear = nn.Linear(in_features=EMBEDDING_DIMENSION, out_features=1)
+        self.layer1 = nn.ModuleList([nn.Linear(in_features=EMBEDDING_DIMENSION, out_features=HIDDEN_DIMENSION)
+                                    for _ in range(NO_OF_STEPS)])
+        self.layer2 = nn.ModuleList([nn.Linear(in_features=EMBEDDING_DIMENSION, out_features=HIDDEN_DIMENSION)
+                                    for _ in range(NO_OF_STEPS)])
+        self.linear_sm = nn.ModuleList([nn.Linear(in_features=EMBEDDING_DIMENSION, out_features=1)
+                                        for _ in range(NO_OF_STEPS)])
 
-    def forward(self, u, mask):
-        h_u = self.activation(self.layer1(u)) * torch.unsqueeze(self.activation(self.layer2(self.m_u)), 1)
-        alpha_u = self.linear(h_u)# * torch.unsqueeze(mask, 2)  # BATCH_SIZE * MAX_LEN * 1
-        # masking before taking softmax to nullify padding
+    def forward(self, u, mask, k):
+        h_u = self.activation(self.layer1[k](u)) * torch.unsqueeze(self.activation(self.layer2[k](self.m_u)), 1)
+        alpha_u = self.linear_sm[k](h_u)
         alpha_u.data.masked_fill_((1-mask).data.unsqueeze(2).byte(), -float('inf'))
         alpha_u = F.softmax(alpha_u, dim=1)
-        return (alpha_u * u).sum(1)     # Context vector: BATCH_SIZE * HIDDEN_DIMENSION
+        # masking to nullify padding
+        return (alpha_u * u).sum(1)  # Context vector: BATCH_SIZE * HIDDEN_DIMENSION
 
 
 class V_Att(torch.nn.Module):
     def __init__(self):
         super(V_Att, self).__init__()
-        self.layer1 = nn.Linear(in_features=VISUAL_FEATURE_DIMENSION, out_features=HIDDEN_DIMENSION)
         self.activation = nn.Tanh()
-        self.layer2 = nn.Linear(in_features=EMBEDDING_DIMENSION, out_features=HIDDEN_DIMENSION)
-        self.linear = nn.Linear(in_features=EMBEDDING_DIMENSION, out_features=1)
-        self.linear_transform = nn.Linear(in_features=VISUAL_FEATURE_DIMENSION, out_features=EMBEDDING_DIMENSION)
+        self.layer1 = nn.ModuleList([nn.Linear(in_features=VISUAL_FEATURE_DIMENSION, out_features=HIDDEN_DIMENSION)
+                                    for _ in range(NO_OF_STEPS)])
+        self.layer2 = nn.ModuleList([nn.Linear(in_features=EMBEDDING_DIMENSION, out_features=HIDDEN_DIMENSION)
+                                     for _ in range(NO_OF_STEPS)])
+        self.linear_sm = nn.ModuleList([nn.Linear(in_features=EMBEDDING_DIMENSION, out_features=1)
+                                        for _ in range(NO_OF_STEPS)])
+        self.P = nn.ModuleList([nn.Linear(in_features=VISUAL_FEATURE_DIMENSION, out_features=EMBEDDING_DIMENSION)
+                                for _ in range(NO_OF_STEPS + 1)])
 
-    def forward(self, v):
-        h_v = self.activation(self.layer1(v)) * torch.unsqueeze(self.activation(self.layer2(self.m_v)), 1)
-        alpha_v = self.linear(h_v)  # BATCH_SIZE * NO_OF_REGIONS_IN_IMAGE * 1
+    def forward(self, v, k):
+        h_v = self.activation(self.layer1[k](v)) * torch.unsqueeze(self.activation(self.layer2[k](self.m_v)), 1)
+        alpha_v = self.linear_sm[k](h_v)  # BATCH_SIZE * NO_OF_REGIONS_IN_IMAGE * 1
         alpha_v = F.softmax(alpha_v, dim=1)
-        return self.activation(self.linear_transform((alpha_v * v).sum(1)))    # Context vector: BATCH_SIZE * EMBEDDING_DIMENSION
+        return self.activation(
+            self.P[k + 1]((alpha_v * v).sum(1)))  # Context vector: BATCH_SIZE * EMBEDDING_DIMENSION
 

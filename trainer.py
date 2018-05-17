@@ -177,6 +177,8 @@ def train():
     optimizer = torch.optim.Adadelta(model.parameters(), lr=0.1, weight_decay=0.0001)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=30, gamma=0.1)
     prev_best = 0
+    r_at_1, r_at_5, r_at_10 = recall(model, img_one_hot)
+    print("Initial R@1 : {}, R@5 : {}, R@10 : {}".format(r_at_1, r_at_5, r_at_10))
     for epoch in range(EPOCHS):
         scheduler.step()
         minibatch = 1
